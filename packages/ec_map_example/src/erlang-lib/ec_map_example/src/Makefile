@@ -3,8 +3,8 @@ include ../vsn.mk
 
 APP_NAME   = ec_map_example
 APP_DIR    = $(shell dirname $(PWD))
-GENET	   = ../../../../ec_genet
-YANG_DIR   = ../../yang
+GENET	   = ../../../../../ec_genet
+YANG_DIR   = ../../../yang
 YANGS	   = $(filter-out %-ann.yang, $(wildcard $(YANG_DIR)/*.yang))
 NS_DIR	   = ../ns
 NS_FILES   = $(YANGS:$(YANG_DIR)/%.yang=$(NS_DIR)/%.hrl)
