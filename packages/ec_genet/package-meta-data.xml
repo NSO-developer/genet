@@ -1,0 +1,6 @@
+<ncs-package xmlns="http://tail-f.com/ns/ncs-packages">
+  <name>ec_genet</name>
+  <package-version>1.0</package-version>
+  <description>Generated Erlang package</description>
+  <ncs-min-version>4.3</ncs-min-version>
+</ncs-package>

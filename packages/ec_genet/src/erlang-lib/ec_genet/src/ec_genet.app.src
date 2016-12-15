@@ -1,0 +1,12 @@
+%% This is an -*- erlang -*- file
+
+{application, ec_genet,
+ [
+  {description, "GENET YANG Transform Application Framework"},
+  {vsn, "%VSN%"},
+  {modules, [%MODULES%]},
+  {mod, {ec_genet, []}},
+  {registered, [ec_genet_server]},
+  {applications, [stdlib, kernel]},
+  {env, [{ncs_restart_type,permanent}]}
+ ]}.

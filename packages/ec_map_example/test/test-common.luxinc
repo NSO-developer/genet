@@ -1,0 +1,53 @@
+
+[config require=NCS_DIR]
+[config timeout=25000]
+[config cleanup_timeout=25000]
+
+[macro oper-prompt]
+    ?genet-oper#
+[endmacro]
+[macro cfg-prompt]
+    ?genet-cfg#
+[endmacro]
+[macro set-prompts]
+    ?#
+    !prompt1 "genet-oper# "
+    [invoke oper-prompt]
+    !prompt2 "genet-cfg# "
+    [invoke oper-prompt]
+[endmacro]
+
+[macro commit]
+    !commit
+    ?Commit complete
+    [invoke cfg-prompt]
+[endmacro]
+
+[macro genet_cli]
+    !ncs_cli -u admin -C
+    ?admin connected
+    [invoke set-prompts]
+    [invoke oper-prompt]
+[endmacro]
+
+[macro genet_cli_initial]
+    [invoke genet_cli]
+    !config
+
+    # Any error message now means failure
+    -[Ee][Rr][Rr][Oo][Rr]
+
+    # Check things are blank at the beginning
+    [invoke cfg-prompt]
+[endmacro]
+
+[macro check-callbacks target]
+    [my lastshell=$LUX_SHELLNAME]
+[shell callbacks]
+    -Error|error|fail|Fail
+    !ncs --check-callbacks $target
+    !echo ==$$?==
+    ?==0==
+
+[shell $lastshell]
+[endmacro]

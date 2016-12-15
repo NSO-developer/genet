@@ -1,0 +1,13 @@
+logs
+ncs-cdb
+ncs.conf
+scripts
+state
+target
+old
+lux_logs
+*.beam
+*.app
+*.log
+*.fxs
+trafo-example*.hrl

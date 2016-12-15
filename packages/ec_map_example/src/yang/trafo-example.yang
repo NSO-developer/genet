@@ -1,0 +1,848 @@
+module trafo-example {
+  namespace "http://cisco.com/ns/genet/examples/transforms";
+  prefix ex;
+
+  import ietf-inet-types { prefix inet; }
+
+  import tailf-common { prefix tailf; }
+
+  identity example-identity-base;
+  identity example-identity-id1 {
+    base example-identity-base;
+  }
+  identity example-identity-id2 {
+    base example-identity-base;
+  }
+  identity example-identity-id3 {
+    base example-identity-base;
+  }
+  
+  container example-domain {
+
+//////////////////////////////////////////////////////////////////////
+// Direct Mappings
+//////////////////////////////////////////////////////////////////////
+
+    container direct {
+      container leaf-string {
+        description
+          "This leaf is direct mapped to an LL path with no other
+           transformation. PERFECT mapping.";
+        leaf a {
+          type string;
+        }
+      }
+      container leaf-uint {
+        description
+          "This leaf is direct mapped to an LL path with no other
+           transformation. PERFECT mapping.";
+        leaf a {
+          type uint32;
+          default 14;
+        }
+      }
+      container leaf-ip {
+        description
+          "This leaf is direct mapped to an LL path with no other
+           transformation. PERFECT mapping.";
+        leaf a {
+          type inet:ip-address;
+        }
+      }
+      container leaf-empty {
+        description
+          "This leaf is direct mapped to an LL path with no other
+           transformation. PERFECT mapping.";
+        leaf a {
+          type empty;
+        }
+      }
+      container container {
+        description
+          "Normal containers do not carry any information, so need
+           no mapping. PERFECT mapping.";
+      }
+      container container-presence {
+        description
+          "Presence containers can be created and deleted, so they
+           need to be mapped. This p-container is direct mapped to
+           an LL path with no other transformation.
+           PERFECT mapping.";
+        presence 
+          "Creation/deletion of this p-container is an act of
+           configuration.";
+      }
+      container choice {
+        description
+          "Each member of a choice statement need to be mapped in
+           its own right. A direct map for each member in this
+           example. On top of that the choice statement itself
+           need to be mapped to something that knows which branch
+           is selected.
+           There are three cases in this choice: b, g and h. They
+           correspond to low level cases l, q and r.
+           PERFECT mapping.";
+        choice a {
+          case b {
+            leaf e { type string; }
+            leaf f { type uint32; }
+          }
+          leaf g { type empty; }
+          container h {
+            leaf i { type inet:ip-address; }
+            leaf j { type boolean; }
+          }
+        }
+      }
+      container choice-in-choice {
+        description
+          "Sometimes we see choices in choices. 
+           This example happens to be logically equivalent to the
+           single choice case above.
+           Each member of a choice statement need to be mapped in
+           its own right. A direct map for each member in this
+           example. On top of that the choice statement itself
+           need to be mapped to something that knows which branch
+           is selected.
+           There are three cases in these choices: b/d, b/g and h.
+           They correspond to low level cases l/n, l/q and r.
+           PERFECT mapping.";
+        choice a {
+          case b {
+            choice c {
+              case d {
+                leaf e { type string; }
+                leaf f { type uint32; }
+              }
+              leaf g { type empty; }
+            }
+          }
+          container h {
+            leaf i { type inet:ip-address; }
+            leaf j { type boolean; }
+          }
+        }
+      }
+      container leaf-list {
+        description
+          "This is a leaf-list, i.e. a leaf that can hold multiple
+          values.  From the mapping logic perspective, it behaves
+          pretty much the same as a usual leaf.  PERFECT mapping.";
+        leaf-list a {
+          type int8;
+        }
+      }
+      container list {
+        description
+          "
+          A list mapping requires few more operations then a leaf or a
+          container: mapping between list instances, handling of an
+          instance creation, and a special case for a 'instance
+          existence check', issued as a get query on the list key.
+          PERFECT mapping";
+        list a {
+          key b;
+          leaf b {
+            type string;
+          }
+        }
+      }
+    }
+
+//////////////////////////////////////////////////////////////////////
+// Types Example Mappings
+//////////////////////////////////////////////////////////////////////
+    container types {
+      description
+        "Collection of examples showing direct mapping for (some of) the
+        possible YANG types. The leaves do not need any special
+        handling, but the purpose is to show how to deal with internal
+        representation of the values.";
+      container integers {
+        container int32 {
+          leaf a { type int32; }
+        }
+        container uint32 {
+          leaf a { type uint32; }
+        }
+        container uint8 {
+          leaf a { type uint8; }
+        }
+      }
+      container string {
+        leaf a { type string; }
+      }
+      container union {
+        description
+          "This is a showcase how we can distinguish between types of
+          the union value";
+        leaf a {
+          type union {
+            type uint8 { range '0..100'; }
+            type int32 { range '1000..2000'; }
+            type boolean;
+            type string;
+          }
+        }
+      }
+      container ip-address {
+        description
+          "IP-address is actually a union of ipv4 and ipv6 address
+          types, so we may need to distinguish the two when processing.";
+        leaf a {
+          type inet:ip-address;
+        }
+      }
+      container ipv6-prefix {
+        description
+          "IPv6 prefix is represented as a tuple of IPv6 address and
+          the prefix.";
+        leaf a {
+          type inet:ipv6-prefix;
+        }
+      }
+      container leaf-list {
+        description
+          "A leaf list value is represented by a single value in the
+          form of a Erlang list, each member a representation of the
+          base type value.";
+        leaf-list a {
+          type uint8;
+        }
+      }
+  }
+
+//////////////////////////////////////////////////////////////////////
+// Value Domain Mappings
+//////////////////////////////////////////////////////////////////////
+
+    container value {
+      container constant { 
+        description 
+          "This leaf is mapped to a constant value 4711,
+           because it has no LL model counterpart. We issue an
+           operator error if set to anything else.
+           LIMITATION mapping.";
+        leaf a {
+          type uint32;
+        }
+      }
+      container range {
+        container expanding {
+          description
+            "This leaf has a range 0..2 and is mapped to an LL leaf
+             with a range 0..3, where 0<->0, 1<->1, 2<->2 and 3 has
+             no representation in the HL model. Also see the scaling
+             examples for some related use cases.
+             If the LL model has an initial configuration value of 3
+             we have to report something back to the HL. We choose to
+             lie and report 1, because that is the 'closest' value.
+             Note that if a backup of the configuration in this state
+             is taken and later restored, the machine will be doing
+             something else than before the backup.
+             APPROXIMATION mapping.";
+          leaf a {
+            type uint8 {
+              range "0..2";
+            }
+          }
+        }
+        container contracting {
+          description
+            "This leaf has a range 0..3 and is mapped to an LL leaf
+             with a range 0..2, where 0<->0, 1<->1, 2<->2 but 3 has
+             no representation in the LL model. Also see the scaling
+             examples for some related use cases.
+             If the HL model is configured with a value 3 we return
+             an operator error here. LIMITATION mapping.";
+          leaf a {
+            type uint8 {
+              range "0..3";
+            }
+          }
+        }
+      }
+      container scaling {
+        container expanding {
+          description
+            "This leaf has a range 0..100 and is mapped to an LL leaf
+             with a range 0..255, so we have to scale the numbers.
+             Also see the range examples for some related use cases.
+             If the device has an initial configuration does not
+             match exactly one of the values which can be set in the
+             HL model this leads to a certain loss of precision.
+             E.g. if the LL value is 1, the HL model will report this
+             as 0. APPROXIMATION mapping.";
+          leaf a {
+            type uint8 {
+              range "0..100";
+            }
+          }
+        }
+        container contracting {
+          description
+            "This leaf has a range 0..255 and is mapped to an LL leaf
+             with a range 0..100, so we have to scale the numbers.
+             Also see the range examples for some related use cases.
+             Since multiple HL values are mapped to the same LL value
+             there will be cases where the configuration will appear
+             to be modified spontaneously by the underlaying system.
+             E.g. a manager sets the value 1, and reads back value 0.
+             AUTOCONFIG mapping.";
+          leaf a {
+            type uint8 {
+              range "0..255";
+            }
+          }
+        }
+      }
+      container precision {
+        description
+          "This leaf allows fractional numbers, whereas its LL
+          counterpart allows integers only, so we are losing precision
+          when mapping to LL.  Conceptually this is similar to the
+          contracting example above.  AUTOCONFIG mapping.";
+        leaf a {
+          type decimal64 {
+            range '0..10';
+            fraction-digits 2;
+          }
+        }
+      }
+      container offset {
+        description
+          "This leaf with range 0..7 is mapped to a leaf with range
+          1..8; we need to add/substract 1 when mapping down to/up
+          from LL.";
+        leaf a {
+          type uint8 {
+            range '0..7';
+          }
+        }
+      }
+      container composition {
+        description
+          "This is an example how simpler mappings can be composed to
+          more complex ones. This leaf is mapped from -100..100 to
+          0..255 - i.e. shifted and scaled.";
+        leaf a {
+          type int32 {
+            range "-100..100";
+          }
+        }
+      }
+      container types {
+        container integers {
+          description
+            "When mapping between equivalent but non-identical types,
+             the type tag may need to be handled; for plain numeric
+             types values can be converted automatically, even if this
+             may not the best practice.";
+          leaf a {
+            type uint16 {
+              range 0..1000;
+            }
+          }
+        }
+        container lists {
+          description
+            "The same as for plain leafs can be used for list
+             keys. Here we are converting a list keyed by 0.255, but
+             represented as a uint8 on higher-level DM and as a int32
+             on lower-level DM.";
+          list a {
+            key b;
+            leaf b {
+              type uint8;
+            }
+          }
+        }
+        container leaf-list {
+          description
+            "When converting leaf-list type, we need to convert the
+            individual entries";
+          leaf-list a {
+            type int8 {
+              range 0..100;
+            }
+          }
+        }
+      }
+      container representation {
+        container string-to-binary {
+          description
+            "Values can often be (almost) equivalently represented in a
+          number of base types; this example converts between to MAC
+          address representation, more standard string of
+          colon-separated hex pairs, and a binary string. The mapping
+          cannot be perfect though, we are losing the information
+          about case of the characters.";
+          leaf a {
+            type string {
+              pattern '[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}';
+            }
+          }
+        }
+        container integer-to-string {
+          description
+            "
+            We are converting between integers and their textual
+            representation.  PERFECT mapping.";
+          leaf a {
+            type int32 {
+              range 0..1000;
+            }
+          }
+        }
+        container identityref {
+          description
+            "This leaf is a identity reference and we are mapping it to
+            a string. The low-level string allows only three values
+            corresponding to the identity names, so with proper value
+            and type conversion, we have a perfect mapping.";
+          leaf a {
+            type identityref {
+              base example-identity-base;
+            }
+          }
+        }
+      }
+      container enumerations {
+        description
+          "
+          Mapping between equivalent but differently ordered or named
+          enumerations.  Enums are represented by their numeric values
+          (derived from the order, by default), so we do not have
+          their textual representation in the runtime, though it can
+          be retrieved from confd.";
+        leaf a {
+          type enumeration {
+            enum trace;
+            enum debug;
+            enum info;
+            enum alert;
+          }
+        }
+      }
+    }
+    container existence { 
+      container constant {
+        description
+          "The leaf is not mapped, it never exists.  Existence checks always
+          return false, and yields an error on create.";
+        leaf a {
+          type empty;
+        }
+      }
+      container sentinel {
+        container sentinel-hl {
+          description
+            "The leaf has the same range as the low-level counterpart, plus one
+             special value '0' returned when the LL leaf does not exist.  The
+             leaf always exists (reports a value).  PERFECT mapping.";
+          leaf a {
+            type uint8 {
+              range 0..100;
+            }
+            default 0;
+          }
+        }
+        container sentinel-ll {
+          description
+            'The opposite situation - the leaf has the same range as the
+            low-level counterpart, but the LL leaf has a sentinel value "" which
+            is to be understood on HL as not-exists';
+          leaf a {
+            type string {
+              length 1..max;
+            }
+          }
+        }
+      }
+      container boolean {
+        container boolean-to-existence {
+          description
+            "The HL leaf is boolean, and its value is mapped to the existence of
+            the LL leaf (with type empty).";
+          leaf a {
+            type boolean;
+            default false; // by default the LL leaf does not exist
+          }
+        }
+        container existence-to-enum {
+          description
+            "The oposite scenario - the empty leaf is mapped to two-valued enum.";
+          leaf a {
+            type empty;
+          }
+        }
+      }
+      container case-map {
+        description
+          "The leaves in the choice are mapped on two leaves of the
+          same types, plus one enumeration leaf indicating which case
+          is active.  Note that the LL model allows states not
+          representable in HL: the enum indicates case e, but the LL
+          leaf corresponding to d exists - we ignore the LL value; and
+          the enum has a value, but none of the two leaves exist - we
+          report it as if the enum did not exist.  APPROXIMATION
+          mapping.";
+        choice a {
+          case b {
+            leaf c {
+              type string;
+            }
+            leaf d {
+              type int32;
+            }
+          }
+          case e {
+            leaf f {
+              type string;
+            }
+          }
+        }
+      }
+    }
+    container address {
+      container constant {
+        description
+          "The simplest case - a leaf is mapped to a leaf with the
+          same name and type.  PERFECT mapping.";
+        leaf a {
+          type uint32;
+        }
+      }
+      container dynamic {
+        container choice {
+          description
+            "This example shows mapping of a leaf 'a' to a leaf 'k' if 'd' is
+             true, or to 'l' if it is false. The behavior if 'd' is unset is to
+             set it to false (if 'a' is set); if 'd' or 'a' is explicitely
+             deleted, the other is deleted as well.";
+          leaf a { type string; }
+          leaf d { type boolean; }
+        }
+        container lists {
+          description
+            "Now we are mapping a list to three different lists based
+             on the key value.  The key is in format 'I-X', where I is
+             one of 1, 2, or 3, X is a value to be used as a key for
+             the low-level list - one of l1, l2, or l2, based on I.";
+          list l {
+            key a;
+            leaf a {
+              type string {
+                pattern "[123]-[0-9]*";
+              }
+            }
+          }
+        }
+      }
+      container key-constant {
+        description
+          "The HL list has two keys, the LL list has one key; here we
+          want the second key to be fixed at a certain value and
+          report an error whenever the operator tries to create an
+          instance with a different value.  LIMITATION mapping.";
+        list a {
+          key "b c";
+          leaf b {
+            type string;
+          }
+          leaf c {
+            type uint32;
+          }
+        }
+      }
+      container key-offset {
+        list a {
+          description
+            "Basic mapping of key values: HL key value in the range
+            0..7 is mapped to the corresponding LL value in the range
+            1..8.";
+          key b;
+          leaf b {
+            type int32 {
+              range "0..7";
+            }
+          }
+        }
+      }
+      container key-container {
+        description
+          "The two subcontainers of this container are mapped to
+          different instances of the LL list.  The mapping is not
+          perfect since we do not differ between two LL states: the LL
+          instance does not exist; and the LL instance exists, but the
+          leaf does not - in both cases we report that the HL leaf
+          does not exist, since the containers are normal
+          (non-presence).  APPROXIMATION mapping.";
+        container a {
+          leaf c {
+            type string;
+          }
+        }
+        container b {
+          leaf c {
+            type string;
+          }
+        }
+      }
+      container lookup-table {
+        description
+          "
+          In this case there is no function that is able to compute
+          the LL key value from the HL key value (and vice versa): the
+          HL key values are assigned by the operator, but the key
+          values in the LL list instances are somewhat assigned by the
+          system - in our case, we are incrementing the value as
+          instances are created.  The list key is mapped using an
+          external (necessarily persistent) table mapping the keys (in
+          both directions).  PERFECT mapping, provided we are able to
+          keep the table up to date, even in case the LL configuration
+          is modified directly, or we can be sure no such modification
+          will be done.";
+        list a {
+          key b;
+          leaf b {
+            type string;
+          }
+          leaf c {
+            type string;
+          }
+        }
+      }
+    }
+    container structure {
+      container leafs {
+        container one-to-multiple-copies {
+          description
+            "This leaf is mapped to two copies - when set, we write it
+            to both, when retrieved we choose to use only the first LL
+            leaf.  APPROXIMATION mapping.";
+          leaf a {
+            type string;
+          }
+        }
+        container one-to-multiple-parts {
+          description
+            "
+            We are mappping a IPv4 prefix (one leaf) to subnet IPv4
+            address and a mask (two leaves).  PERFECT mapping
+            (assuming the subnet address and mask have the standard
+            properties).";
+          leaf a {
+            type inet:ipv4-prefix;
+          }
+        }
+        container many-to-one {
+          description
+            "The opposite situation to the above - we are mapping two
+            numbers to a single string in the form 'NNN:NNN'.  PERFECT
+            mapping, except for the situation when one leaf exists and
+            the other does not; we are preventing this through 'must'.";
+          leaf a {
+            must ../b {
+              tailf:dependency ../b;
+              error-message "The leaf b must be set too";
+            }
+            type uint32 {
+              range '1..999';
+            }
+          }
+          leaf b {
+            must ../a {
+              tailf:dependency ../a;
+              error-message "The leaf a must be set too";
+            }
+            type uint32 {
+              range '1..999';
+            }
+          }          
+        }
+      }
+      container lists {
+        container split-by-cols {
+          description
+            "This list maps to two separate LL lists, which are both
+             keyed the same way as the HL list. Column d is in one LL
+             list and column e in the other. Some entries may exist
+             only in one or the other LL list. In this case we chose
+             to display a HL list item for each entry that exists in
+             either list (union mode). When creating new HL list
+             entries, we elect to create them in both lists.
+             PERFECT mapping.";
+          list a {
+            key c;
+            leaf c { type uint32; }
+            leaf d { type string; }
+            leaf e { type inet:ip-address; }
+          }
+        }
+        container split-by-rows {
+          container union {
+            description
+              "The list is mapped to two lists based on the value of
+              the leaf c working as a discriminator: for application
+              instances in LL that appear in ipv4/ipv6 report c as
+              ipv4/ipv6 respectively, if the application is in both
+              lists, report as 'both'.  Note that in case of 'both'
+              the leaf d can have two possible data sources - we are
+              using the ipv4 instance only.  APPROXIMATION mapping.";
+            list a {
+              key "b";
+              leaf b {
+                type enumeration {
+                  enum ssh;
+                  enum apache;
+                  enum docker;
+                }
+              }
+              leaf c {
+                mandatory true;
+                type enumeration {
+                  enum ipv4;
+                  enum ipv6;
+                  enum both;
+                }
+              }
+              leaf d { type string; }
+            }
+          }
+          container join {
+            description
+              "Similar example as before, and using the same LL data
+              model, but now we are 'gluing' the two lists together
+              and indicate in the key the type of application.  This
+              time we have only one source for the leaf - PERFECT
+              mapping.";
+            list a {
+              key "b c";
+              leaf b {
+                type enumeration {
+                  enum ssh;
+                  enum apache;
+                  enum docker;
+                }
+              }
+              leaf c {
+                type enumeration {
+                  enum ipv4;
+                  enum ipv6;
+                }
+              }
+              leaf d { type string; }
+            }
+          }
+        }
+        container sequencing {
+          description
+            "This list maps perfectly on its LL counterpart, only the
+            HL list is keyed by numbers, the LL list is keyed by the
+            string representation.  This means not only changing the
+            key type, but also different ordering of the entries; for
+            some management systems or northbound interfaces (such as
+            SNMP) it may not be acceptable, so we may need to sort the
+            HL list entries before returning them.  PERFECT mapping.";
+          list a {
+            key b;
+            leaf b {
+              type uint32 {
+                range 0..999;
+              }
+            }
+            leaf c {
+              type string;
+            }
+          }
+        }
+      }
+      container nested-lists {
+        container nested-list-to-flat {
+          description
+            "The two nested list, each with one key, are mapped to one list with
+            two keys.  Note that the configuration spaces are not exactly
+            equivalent - the case when an outer list instance exists but has no
+            inner list instances cannot be represented by the LL data model.
+            AUTOCONFIG mapping.";
+          list a {
+            key b;
+            leaf b { type uint32; }
+            list c {
+              key d;
+              leaf d { type string; }
+              leaf e { type boolean; }
+            }
+          }
+        }
+        container flat-list-to-nested {
+          description
+            "This list with two keys is mapped to two nested list, each with one
+            key.  For the same reasons as above, the mapping is not perfect -
+            the case when in the LL configuration an outer list instance has no
+            inner list instances is reported as no instance at all.
+            APPROXIMATION mapping.";
+          list a {
+            key "b c";
+            leaf b { type inet:ip-address; }
+            leaf c { type string; }
+            leaf d { type uint8; }
+          }
+        }
+      }
+      container list-to-leaf-list {
+        description
+          "Mapping a HL list (with only the key) to a LL leaf-list.  PERFECT
+          mapping.";
+        list a {
+          key b;
+          leaf b { type uint32; }
+        }
+      }
+    }
+    container nesting {
+      container address-value {
+        description
+          "The leaf value is split in two parts, the first one - 0 or
+          1 - is used to indicate a target, the other is used as a
+          value for the target.  The aim is to show how mappings can
+          be composed.  PERFECT mapping.";
+        leaf a {
+          type string {
+            pattern '[01].*';
+          }
+        }
+      }
+      container existence-address {
+        description
+          "This (somewhat contrieved) example is similar to the one
+          above, only in the opposite direction.  From the HL
+          perspective, the LL leaf indicates which of the two cases
+          exists, and if the non-mandatory leaf exists; if the LL leaf
+          does not exist at all, none of the cases are reported as
+          set.  PERFECT mapping.";
+        choice a {
+          case b {
+            leaf c {
+              mandatory true;
+              type empty;
+            }
+            leaf d {
+              type empty;
+            }
+          }
+          case e {
+            leaf f {
+              mandatory true;
+              type empty;
+            }
+            leaf g {
+              type empty;
+            }
+          }
+        }
+      }
+    }
+  }
+}

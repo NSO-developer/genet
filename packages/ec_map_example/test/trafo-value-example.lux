@@ -1,0 +1,203 @@
+[doc Sanity checks for the trafo value examples]
+
+[include trafo-ex-common.luxinc]
+
+[macro test-direct path value]
+    [invoke test-ex-common "direct $path a" $value $noentries]
+[endmacro]
+
+[macro test-value path value]
+    [invoke test-ex-common "value $path a" $value $noentries]
+[endmacro]
+
+[macro test-value-def path value defval]
+    [invoke test-ex-common "value $path a" $value "example-domain value $path a $defval"]
+[endmacro]
+
+[macro test-types path value]
+    [invoke test-ex-common "types $path a" $value $noentries]
+[endmacro]
+
+[macro test-types-def path value defval]
+    [invoke test-ex-common "types $path a" $value "example-domain types $path a $defval"]
+[endmacro]
+
+[macro test-empty-node path]
+    !do show running-config example-domain $path
+    ?% No entries found
+    !example-domain $path
+    [invoke commit]
+    !do show running-config example-domain $path
+    """?
+    example-domain $path
+    confd-cfg#
+    """
+[endmacro]
+
+[shell confd_cli]
+    [invoke confd_cli_initial]
+
+    # direct mapping
+    !no example-domain direct
+    !commit
+    ?Commit complete|No modifications to commit
+
+    [invoke test-direct leaf-string abcd]
+    [invoke test-ex-common "direct leaf-uint a" 12 "direct leaf-uint a 14"]
+    [invoke test-direct leaf-ip 10.1.2.3]
+    [invoke test-empty-node "direct leaf-empty a"]
+    [invoke test-empty-node "direct container-presence"]
+    [invoke test-ex-common "direct choice e" abcd $noentries]
+    [invoke test-ex-common "direct choice f" 12 $noentries]
+    [invoke test-ex-common "direct choice h i" 10.1.2.3 $noentries]
+
+    [invoke test-ex-common "direct choice-in-choice e" abcd $noentries]
+    [invoke test-ex-common "direct choice-in-choice f" 12 $noentries]
+    [invoke test-ex-common "direct choice-in-choice h i" 10.1.2.3 $noentries]
+    [invoke test-ex-common "direct choice-in-choice h j" false $noentries]
+    !do show running-config example-domain direct choice-in-choice
+    """?
+    show running-config.*
+    example-domain direct choice-in-choice h i 10.1.2.3
+    example-domain direct choice-in-choice h j false
+    confd-cfg#
+    """
+    [invoke test-direct leaf-list "[ 12 14 ]"]
+    [invoke test-ex-common "direct list a" 12 $noentries]
+    [invoke test-ex-common "direct list a" 14 "direct list a 12"]
+
+    # value mapping
+
+    !no example-domain value
+    !commit
+    ?Commit complete|No modifications to commit
+
+    !example-domain value constant a 4711
+    !commit
+    ?No modifications to commit
+    !do show running-config example-domain value constant
+    ?example-domain value constant a 4711
+    !example-domain value constant a 4712
+    !commit
+    ?Only the value 4711 can be supported
+    !example-domain value constant a 4711
+
+    [invoke test-value "range expanding" 1]
+    !example-device value range expanding k 3
+    !show configuration merge example-domain value range expanding
+    ?example-domain value range expanding a 2
+    [invoke commit]
+
+    [invoke test-value "range contracting" 2]
+    !example-domain value range contracting a 3
+    !commit
+    ?cannot be supported
+    [invoke test-value-def "range contracting" 1 2]
+
+    [invoke test-value "scaling expanding" 8]
+
+    [invoke test-value "scaling contracting" 250]
+
+    [invoke test-value precision 2]
+    !example-domain value precision a 3.3
+    [invoke commit]
+    !do show running-config example-domain value precision
+    ?example-domain value precision a 3
+
+
+    [invoke test-value offset 0]
+    [invoke test-value-def offset 7 0]
+
+    [invoke test-value composition 0]
+    [invoke test-value-def composition -100 0]
+    [invoke test-value-def composition 100 -100]
+
+    [invoke test-value "types integers" 101]
+    [invoke test-ex-common "value types lists a" 10 $noentries]
+    [invoke test-value "types leaf-list" "[ 1 2 3 10 ]"]
+
+    [invoke test-value "representation string-to-binary" AA:BB:CC:DD:EE:FF]
+
+    [invoke test-value "representation integer-to-string" 123]
+
+    [invoke test-value "representation identityref" example-identity-id1]
+
+    [invoke test-value enumerations debug]
+    [invoke test-value-def enumerations alert debug]
+
+
+    # Types tests
+
+    !no example-domain types
+    !commit
+    ?Commit complete|No modifications to commit
+
+    [invoke test-types "integers int32" -2]
+
+    [invoke test-types "integers uint32" 1234]
+
+    [invoke test-types "integers uint8" 129]
+
+    [invoke test-types string abcd]
+
+    [invoke test-types union 99]
+    [invoke test-types-def union 1234 99]
+    [invoke test-types-def union abcd 1234]
+    [invoke test-types-def union false abcd]
+
+    [invoke test-types ip-address 2.3.4.5]
+    [invoke test-types-def ip-address 2001:db8:85a3::8a2e:370:7334 2.3.4.5]
+
+    [invoke test-types ipv6-prefix 2001:db8:85a3::/64]
+
+    [invoke test-types leaf-list "[ 2 3 4 ]"]
+    !example-domain types leaf-list a [ ]
+    [invoke commit]
+    !do show running-config example-domain types leaf-list
+    ?No entries found
+
+    # existence domain tests
+
+    !no example-domain existence
+    !commit
+    ?Commit complete|No modifications to commit
+
+    !example-domain existence constant a
+    !commit
+    ?Aborted: 'example-domain existence constant a':.*cannot be created
+    !no example-domain existence constant a
+    !commit
+    ?No modifications
+
+    [invoke test-ex-common "existence sentinel sentinel-hl a" 12 "sentinel-hl a 0"]
+    [invoke verify-ex-device "existence sentinel sentinel-hl k" 12]
+    [invoke test-ex-common "existence sentinel sentinel-hl a" 0 "sentinel-hl a 12"]
+    [invoke verify-ex-device-noexists "existence sentinel sentinel-hl"]
+    [invoke verify-ex-device "existence sentinel sentinel-ll k" \"\"]
+    [invoke test-ex-common "existence sentinel sentinel-ll a" abcd $noentries]
+    [invoke verify-ex-device "existence sentinel sentinel-ll k" abcd]
+
+    [invoke test-ex-common "existence boolean boolean-to-existence a" true false]
+    [invoke verify-ex-device "existence boolean boolean-to-existence" k]
+    [invoke test-ex-common "existence boolean boolean-to-existence a" false true]
+    [invoke verify-ex-device-noexists "existence boolean boolean-to-existence"]
+    [invoke verify-ex-device "existence boolean existence-to-enum k" notexists]
+    [invoke test-ex-common "existence boolean existence-to-enum" a $noentries]
+    [invoke verify-ex-device "existence boolean existence-to-enum k" exists]
+
+    [invoke test-ex-common "existence case-map c" abcd $noentries]
+    [invoke test-ex-common "existence case-map d" 12 $noentries]
+    [invoke verify-ex-device "existence case-map k" case-b]
+    [invoke test-ex-common "existence case-map f" abcd $noentries]
+    [invoke verify-ex-device "existence case-map k" case-e]
+    [invoke verify-ex-device-noexists "existence case-map m"]    
+
+[cleanup]
+    [invoke confd_cli]
+    !config
+    !no example-domain direct
+    !no example-domain value
+    !no example-domain types
+    !no example-domain existence
+    !commit
+    ?Commit complete|No modifications to commit
