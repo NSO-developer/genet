@@ -30,12 +30,12 @@
     !do show running-config example-domain $path
     """?
     example-domain $path
-    confd-cfg#
+    genet-cfg#
     """
 [endmacro]
 
-[shell confd_cli]
-    [invoke confd_cli_initial]
+[shell genet_cli]
+    [invoke genet_cli_initial]
 
     # direct mapping
     !no example-domain direct
@@ -60,7 +60,7 @@
     show running-config.*
     example-domain direct choice-in-choice h i 10.1.2.3
     example-domain direct choice-in-choice h j false
-    confd-cfg#
+    genet-cfg#
     """
     [invoke test-direct leaf-list "[ 12 14 ]"]
     [invoke test-ex-common "direct list a" 12 $noentries]
@@ -190,10 +190,10 @@
     [invoke verify-ex-device "existence case-map k" case-b]
     [invoke test-ex-common "existence case-map f" abcd $noentries]
     [invoke verify-ex-device "existence case-map k" case-e]
-    [invoke verify-ex-device-noexists "existence case-map m"]    
+    [invoke verify-ex-device-noexists "existence case-map m"]
 
 [cleanup]
-    [invoke confd_cli]
+    [invoke genet_cli]
     !config
     !no example-domain direct
     !no example-domain value

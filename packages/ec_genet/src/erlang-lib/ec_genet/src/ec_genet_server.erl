@@ -238,14 +238,18 @@ move_after(Tctx, HLPath, PrevKeys) ->
     Mappings = get_mappings(HLPath),
     process_mapping(move_after, Tctx, HLPath, PrevKeys, Mappings).
 get_next(Tctx, HLPath, Next) ->
+    log(info, "get_next", []),
     Mappings = get_mappings(HLPath),
-    case process_mapping(get_next, Tctx, HLPath, Next, Mappings) of
-        RV={ok,{false,_}} ->
-            RV;
-        {ok,{Keys,C}} ->
-            {ok,{convert_key_values(HLPath, Keys),C}};
-        V -> V
-    end.
+    Ret = case process_mapping(get_next, Tctx, HLPath, Next, Mappings) of
+              RV={ok,{false,_}} ->
+                  RV;
+              {ok,{Keys,C}} ->
+                  {ok,{convert_key_values(HLPath, Keys),C}};
+              V -> V
+          end,
+    log(info, "get_next ret ~p (~p)", [Ret, Mappings]),
+    Ret.
+
 get_case(Tctx, HLPath, Choice) ->
     Mappings = get_mappings([Choice|HLPath]),
     process_mapping(get_case, Tctx, HLPath, Choice, Mappings).

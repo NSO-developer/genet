@@ -2,8 +2,8 @@
 
 [include test-common.luxinc]
 
-[shell confd_cli]
-    [invoke confd_cli_initial]
+[shell genet_cli]
+    [invoke genet_cli_initial]
     !no example-domain
     !commit
     ?Commit complete|No modifications to commit
@@ -30,7 +30,7 @@
 
 
 [cleanup]
-    [invoke confd_cli]
+    [invoke genet_cli]
     !config
     !no example-domain
     !commit
