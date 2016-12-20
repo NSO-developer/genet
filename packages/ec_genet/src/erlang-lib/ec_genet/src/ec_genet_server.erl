@@ -238,17 +238,14 @@ move_after(Tctx, HLPath, PrevKeys) ->
     Mappings = get_mappings(HLPath),
     process_mapping(move_after, Tctx, HLPath, PrevKeys, Mappings).
 get_next(Tctx, HLPath, Next) ->
-    log(info, "get_next", []),
     Mappings = get_mappings(HLPath),
-    Ret = case process_mapping(get_next, Tctx, HLPath, Next, Mappings) of
-              RV={ok,{false,_}} ->
-                  RV;
-              {ok,{Keys,C}} ->
-                  {ok,{convert_key_values(HLPath, Keys),C}};
-              V -> V
-          end,
-    log(info, "get_next ret ~p (~p)", [Ret, Mappings]),
-    Ret.
+    case process_mapping(get_next, Tctx, HLPath, Next, Mappings) of
+        RV={ok,{false,_}} ->
+            RV;
+        {ok,{Keys,C}} ->
+            {ok,{convert_key_values(HLPath, Keys),C}};
+        V -> V
+    end.
 
 get_case(Tctx, HLPath, Choice) ->
     Mappings = get_mappings([Choice|HLPath]),
@@ -896,6 +893,8 @@ value_to_string({Type, Int}, Type) when Type >= ?C_INT8, Type =< ?C_UINT64 ->
     {ok, integer_to_list(Int)};
 value_to_string(Bin, ?C_BUF) ->
     {ok, Bin};
+value_to_string(String, ?C_LIST) ->
+    {ok, list_to_binary(String)};
 value_to_string(Val, Type) ->
     TypePair = case Type of
                    ?C_DOUBLE ->

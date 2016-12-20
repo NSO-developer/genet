@@ -56,11 +56,9 @@ start_link() ->
 
 %%--------------------------------------------------------------------
 init([]) ->
-    log(info, "starting map_example", []),
     process_flag(trap_exit, true), % Triggers call to terminate/2
-    log(info, "now start it", []), 
     ok = ec_genet:start_map([?HLROOT], fun get_mappings/1),
-    log(info, "Server genet started", []),
+    log(info, "Server example started", []),
     {ok, #state{}}.
 
 %%--------------------------------------------------------------------
