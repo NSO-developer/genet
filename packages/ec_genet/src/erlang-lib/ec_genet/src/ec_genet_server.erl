@@ -102,12 +102,12 @@ log(trace, Format, Args) ->
 
 reg_mapping(Prio, Path, MapFun) ->
     true = ets:insert(ec_genet_maps,{{-Prio,lists:reverse(Path)},MapFun}),
-    io:format("ec_genet_server registered prio ~p path prefix~n~p~n",[Prio,Path]),
+    log(info, "ec_genet_server registered prio ~p path prefix~n~p", [Prio,Path]),
     ok.
 
 unreg_mapping(Prio, Path) ->
     true = ets:delete(ec_genet_maps,{-Prio,lists:reverse(Path)}),
-    io:format("ec_genet_server unregistered prio ~p path prefix~n~p~n",[Prio,Path]),
+    log(info, "ec_genet_server unregistered prio ~p path prefix~n~p",[Prio,Path]),
     ok.
 
 %%%===================================================================
