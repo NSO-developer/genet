@@ -3,4 +3,7 @@
   <package-version>1.0</package-version>
   <description>Example GENET mapping</description>
   <ncs-min-version>4.3</ncs-min-version>
+  <required-package>
+    <name>ec_genet</name>
+  </required-package>
 </ncs-package>
