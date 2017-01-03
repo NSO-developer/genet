@@ -18,7 +18,7 @@
 -include_lib("econfd/include/econfd_errors.hrl").
 %% @headerfile "ec_genet.hrl"
 -include("ec_genet.hrl").
--include("debug_macros.hrl").
+-include("nodebug_macros.hrl").
 -export([start/2,stop/1,
          start_map/2,start_map/3,stop_map/1,stop_map/2,running_mappings/0,
          exists/2,get_elem/3,get_elem_str/3,get_case/4,get_object/3,

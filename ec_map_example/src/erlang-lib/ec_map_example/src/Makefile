@@ -20,11 +20,13 @@ $(NS_DIR)/%.hrl: $(YANG_DIR)/%.yang
 
 ERLC       = erlc
 ERLC_FLAGS := \
-	+warnings_as_errors \
 	+debug_info \
 	-I $(GENET)/src/erlang-lib/ec_genet/include -I $(NS_DIR) \
 	-pa $(NCS_DIR)/erlang/econfd/ebin \
 	-pa ../../ec_map_example/ebin
+
+# mvolf: turned off errors for no-logging
+#	+warnings_as_errors \
 
 APPSCRIPT = '$$vsn=shift; $$mods=""; while(@ARGV){ $$_=shift; s/^([A-Z].*)$$/\'\''$$1\'\''/; $$mods.=", " if $$mods; $$mods .= $$_; } while(<>) { s/%VSN%/$$vsn/; s/%MODULES%/$$mods/; print; }'
 
