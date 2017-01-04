@@ -13,7 +13,7 @@
 -include_lib("econfd/include/econfd.hrl").
 -include_lib("econfd/include/econfd_errors.hrl").
 -include("ec_genet.hrl").
--include("nodebug_macros.hrl").
+-include("debug_macros.hrl").
 
 -define(SERVER, ?MODULE).
 
@@ -191,9 +191,9 @@ get_mapping_fun(RevHLPath, Key = {Prio, RevPrefixPath}) ->
 s_init(Tctx) ->
     M = (Tctx#confd_trans_ctx.dx)#confd_daemon_ctx.d_opaque,
     econfd_maapi:attach(M, 0, Tctx),
-    TH = Tctx#confd_trans_ctx.thandle,
-    LogLevel = get_current_loglevel(M, TH),
-    inform_about_loglevel(Tctx, LogLevel),
+    %% TH = Tctx#confd_trans_ctx.thandle,
+    %% LogLevel = get_current_loglevel(M, TH),
+    %% inform_about_loglevel(Tctx, LogLevel),
     ?LOGNOTE("========== Transaction initialized =========="),
     {ok, Tctx#confd_trans_ctx{opaque = M}}.
 

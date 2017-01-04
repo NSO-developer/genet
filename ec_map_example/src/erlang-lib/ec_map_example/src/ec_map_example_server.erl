@@ -34,7 +34,7 @@
 -include_lib("econfd/include/econfd.hrl").
 -include_lib("econfd/include/econfd_errors.hrl").
 -include("ec_genet.hrl").
--include("nodebug_macros.hrl").
+-include("debug_macros.hrl").
 -include("mapgens_macros.hrl").
 
 -define(SERVER, ?MODULE).
