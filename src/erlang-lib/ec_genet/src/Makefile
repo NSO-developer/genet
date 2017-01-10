@@ -1,9 +1,9 @@
 include ../vsn.mk
 
-APP_DIR    = $(shell dirname $(PWD))
+APP_DIR    = $(shell dirname $(CURDIR))
 APP_NAME   = $(shell basename $(APP_DIR))
 ERL_FILES  = $(wildcard *.erl)
-HRL_FILES  = $(wildcard *.hrl) $(wildcard include/*.hrl)
+HRL_FILES  = $(wildcard *.hrl) $(wildcard ../include/*.hrl)
 MODULES    = $(ERL_FILES:%.erl=%)
 EBIN_FILES = $(MODULES:%=../ebin/%.beam) ../ebin/$(APP_NAME).app
 
@@ -34,4 +34,4 @@ clean:
 ../ebin/%.beam: %.erl
 	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<
 
-$(EBIN_FILES): $(ERL_FILES) $(HRL_FILES)
+$(EBIN_FILES): $(HRL_FILES)
