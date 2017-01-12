@@ -6,7 +6,7 @@
   {vsn, "%VSN%"},
   {modules, [%MODULES%]},
   {mod, {ec_genet, []}},
-  {registered, [ec_genet_server]},
+  {registered, [ec_genet_server, ec_genet_logger]},
   {applications, [stdlib, kernel]},
   {env, [{ncs_restart_type,permanent}]}
  ]}.

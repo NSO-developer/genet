@@ -33,10 +33,11 @@ init([Port]) ->
     Shutdown = 2000,
     Type = worker,
 
-    AChild = {ec_genet_server, {ec_genet_server, start_link, [Port]},
-              Restart, Shutdown, Type, [ec_genet_server]},
-
-    {ok, {SupFlags, [AChild]}}.
+    GenetChild = {ec_genet_server, {ec_genet_server, start_link, [Port]},
+                  Restart, Shutdown, Type, [ec_genet_server]},
+    LoggerChild = {ec_genet_logger, {ec_genet_logger, start_link, []},
+                  Restart, Shutdown, Type, [ec_genet_logger]},
+    {ok, {SupFlags, [GenetChild, LoggerChild]}}.
 
 %%%===================================================================
 %%% Internal functions

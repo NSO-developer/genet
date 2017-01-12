@@ -5,7 +5,7 @@ APP_NAME   = $(shell basename $(APP_DIR))
 ERL_FILES  = $(wildcard *.erl)
 HRL_FILES  = $(wildcard *.hrl) $(wildcard ../include/*.hrl)
 MODULES    = $(ERL_FILES:%.erl=%)
-EBIN_FILES = $(MODULES:%=../ebin/%.beam) ../ebin/$(APP_NAME).app
+EBIN_FILES = $(MODULES:%=../ebin/%.beam) ../ebin/$(APP_NAME).app ../ebin/loglevels.conf
 
 ERLC       = erlc
 ERLC_FLAGS := \
@@ -30,6 +30,9 @@ clean:
 
 ../ebin/%.app: %.app.src ../vsn.mk Makefile
 	perl -e $(APPSCRIPT) "$(VSN)" $(MODULES) < $< > $@
+
+../ebin/loglevels.conf: loglevels.conf
+	/bin/cp $< $@
 
 ../ebin/%.beam: %.erl
 	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<
