@@ -1,0 +1,55 @@
+module ec-genet-config {
+  namespace "http://tail-f.com/ns/genet";
+  prefix genet;
+
+  typedef genet-log-level-type {
+    type enumeration {
+      enum debug {
+        description
+        "Detailed information, typically of interest only
+           when diagnosing problems.";
+      }
+      enum info {
+        description
+        "Confirmation that things are working as expected.";
+      }
+      enum note {
+        description
+        "Confirmation that things are working.";
+      }
+      enum warn {
+        description
+        "An indication that something unexpected happened,
+           or indicative of some problem in the near future.
+           The software is still working as expected.";
+      }
+      enum error {
+        description
+        "Due to a more serious problem, the software has not
+           been able to perform some function.";
+      }
+      enum off {
+        description
+        "Turn off logging completely.";
+      }
+    }
+    description
+      "Levels of logging for Python packages in 'logging'.";
+  }
+
+  container ec-genet {
+    container logging {
+      leaf log-file-name {
+        description
+          "Destination log file, relative to the ncs running directory.";
+        type string;
+        default "logs/ncs-genet.log";
+      }
+      leaf level {
+        description "Log level threshold.";
+        type genet-log-level-type;
+        default error;
+      }
+    }
+  }
+}

@@ -15,31 +15,22 @@
 
 -define(SERVER, ?MODULE).
 
-%%-define(LEVELMODE, cdb).
--define(LEVELMODE, file).
-
--define(CONFIGFILE, "loglevels.conf").
--define(DEFAULT_OUTPUT, "logs/ncs-genet.log").
-
--record(state, {output=none, levels=[]}).
+-record(state, {output=none, filename=none, levels=[]}).
+-define(ALL_LEVELS, [debug, info, note, warn, error]).  % ordering is important
 
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 init(_Args) ->
     process_flag(trap_exit, true),
-    case get_config_file() of
-        {_, {ok, Dev}} ->
-            ConfState = get_config_state(Dev),
-            file:close(Dev);
-        {Filename, {error, Err}} ->
-            eclog(error, "Cannot open file ~p for reading: ~p", [Filename, Err]),
-            ConfState = #state{}
-    end,
+    %% initial config read in the subscriber
+    ConfState = #state{},
     eclog(info, "logger started", []),
     {ok, ConfState}.
 
-
+handle_call(getstate, _From, State) ->
+    %% debugging only
+    {reply, State, State};
 handle_call(Request, _From, State1) ->
     State2 = process(Request, State1),
     {reply, ok, State2}.
@@ -72,9 +63,26 @@ request(Request) ->
 process({{log, Level, Module, Line, Args}, Timestamp}, State) ->
     output_log(State, Timestamp, {'',Level}, '', location(Module, Line), Args),
     State;
+process({update, Level, File}, State) ->
+    process_state_update(Level, binary_to_list(File), State);
 process(Msg, State) ->
     eclog(error, "Got unexpected request: ~p", [Msg]),
     State.
+
+process_state_update(Level, File, State=#state{filename=File}) ->
+    State#state{levels = lists:dropwhile(fun(L) -> L =/= Level end, ?ALL_LEVELS)};
+process_state_update(LN, File, State) ->
+    if is_pid(State#state.output) ->
+            file:close(State#state.output);
+       true -> ok end,
+    case file:open(File, [write, delayed_write]) of
+        {ok, Dev} ->
+            %% perhaps levels changed too
+            process_state_update(LN, File, State#state{output=Dev, filename=File});
+        Err ->
+            eclog(error, "Failed to open file ~p for logging: ~p", [File, Err]),
+            #state{filename=File}
+    end.
 
 eclog(error, Format, Args) ->
     econfd:log(?CONFD_LEVEL_ERROR, "~p: " ++ Format, [?SERVER | Args]);
@@ -82,96 +90,6 @@ eclog(info, Format, Args) ->
     econfd:log(?CONFD_LEVEL_INFO,  "~p: " ++ Format, [?SERVER | Args]);
 eclog(trace, Format, Args) ->
     econfd:log(?CONFD_LEVEL_TRACE, "~p: " ++ Format, [?SERVER | Args]).
-
-%%%%%%%%%
-%%% Config reading
-%%%%%%%%%
-
-%% @doc Lookup logger config file and open it for reading.
--spec get_config_file() -> {Filename::string(), {error, Reason::any()} | {ok, pid()}}.
-get_config_file() ->
-    Filename = case application:get_env(ec_genet, logconfig) of
-                   undefined -> ?CONFIGFILE;
-                   {ok, Fname} -> Fname
-               end,
-    {Filename, file:open(Filename, [read])}.
-
-%% @doc Read and parse logger config and create #state record to be
-%% used.  If logger config processing fails, return the default state
-%% structure (i.e. no logging at all).
--spec get_config_state(pid()) -> #state{}.
-get_config_state(Device) ->
-    case read_config(Device) of
-        {ok, Conf} ->
-            {file, OutputName} = lists:keyfind(file, 1, Conf),
-            {levels, Levels} = lists:keyfind(levels, 1, Conf),
-            case file:open(OutputName, [write,delayed_write]) of
-                {ok, Dev} ->
-                    #state{output=Dev, levels=Levels};
-                Err ->
-                    eclog(error, "Failed to open file ~p for writing: ~p", [OutputName, Err]),
-                    #state{}
-            end;
-        Err ->
-            eclog(error, "Failed to parse logging config: ~p", [Err]),
-            #state{}
-    end.
-
-%% @doc Read the logger configuration and parse it to the form of
-%% tuple list.  The tuple list always contains `file` and `levels`
-%% entries, at least with default value.
--spec read_config(pid()) -> {ok, Config::[tuple()]} | {error, Reason::string(), any()}.
-read_config(Device) ->
-    InitConfig = [{levels, []}, {file, ?DEFAULT_OUTPUT}],
-    case io:scan_erl_exprs(Device, "") of
-        {ok, Result, _Loc} ->
-            read_config(Result, InitConfig);
-        {eof, _} ->
-            {ok, InitConfig}
-    end.
-
--spec read_config([Token::tuple()], Config::[tuple()]) ->
-                         {ok, Config::[tuple()]} | {error, Reason::string(), any()}.
-read_config([{atom,Line,Key},{'=',Line}|Rest1], Config) ->
-    {ConfigItem, Rest2} = case Key of
-                              levels ->
-                                  read_levels(Rest1, Line);
-                              file ->
-                                  read_file(Rest1, Line)
-                          end,
-    read_config(Rest2, [{Key, ConfigItem} | Config]);
-read_config([], Config) ->
-    {ok, Config};
-read_config(Junk, _) ->
-    {error, "junk at the end of config file", Junk}.
-
--spec read_levels([Token1::tuple()], integer()) -> {[Level::atom()], [Token2::tuple()]}.
-read_levels([{',',Line}|Rest], Line) ->
-    read_levels(Rest, Line);
-read_levels([{atom,Line,Name}|Rest1], Line) ->
-    {Levels,Rest2} = read_levels(Rest1, Line),
-    {[Name|Levels],Rest2};
-read_levels(Rest,_) ->
-    {[], Rest}.
-
--spec read_file([Token1::tuple()], integer()) -> {Name::string(), [Token2::tuple()]}.
-read_file([{string,Line,Name}|Rest], Line) ->
-    {Name, Rest};
-read_file(Tokens, Line) ->
-    {Name, Rest} = read_file_tokens(Tokens, Line),
-    {lists:flatten(Name), Rest}.
-
-read_file_tokens([{C,Line}|Rest1], Line) ->
-    {Name,Rest} = read_file_tokens(Rest1, Line),
-    {[atom_to_list(C)|Name],Rest};
-read_file_tokens([{integer,Line,Int}|Rest1], Line) ->
-    {Name,Rest} = read_file_tokens(Rest1, Line),
-    {[integer_to_list(Int)|Name],Rest};
-read_file_tokens([{_Cat,Line,Atom}|Rest1], Line) ->
-    {Name,Rest} = read_file_tokens(Rest1, Line),
-    {[atom_to_list(Atom)|Name],Rest};
-read_file_tokens(Rest, _) ->
-    {[],Rest}.
 
 %%%%%%%%%
 %%% Logging functions

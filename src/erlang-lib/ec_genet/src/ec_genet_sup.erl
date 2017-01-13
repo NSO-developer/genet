@@ -37,7 +37,9 @@ init([]) ->
                   Restart, Shutdown, Type, [ec_genet_server]},
     LoggerChild = {ec_genet_logger, {ec_genet_logger, start_link, []},
                   Restart, Shutdown, Type, [ec_genet_logger]},
-    {ok, {SupFlags, [GenetChild, LoggerChild]}}.
+    LogConfSubChild = {ec_genet_logconf, {ec_genet_subscriber, start_link, []},
+                  Restart, Shutdown, Type, [ec_genet_subscriber]},
+    {ok, {SupFlags, [GenetChild, LoggerChild, LogConfSubChild]}}.
 
 %%%===================================================================
 %%% Internal functions
