@@ -3,7 +3,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/1]).
+-export([start_link/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -14,15 +14,15 @@
 %%% API functions
 %%%===================================================================
 
-start_link(Port) ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, [Port]).
+start_link() ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 %%%===================================================================
 %%% Supervisor callbacks
 %%%===================================================================
 
 %%--------------------------------------------------------------------
-init([Port]) ->
+init([]) ->
     RestartStrategy = one_for_one,
     MaxRestarts = 1000,
     MaxSecondsBetweenRestarts = 3600,
@@ -33,7 +33,7 @@ init([Port]) ->
     Shutdown = 2000,
     Type = worker,
 
-    GenetChild = {ec_genet_server, {ec_genet_server, start_link, [Port]},
+    GenetChild = {ec_genet_server, {ec_genet_server, start_link, []},
                   Restart, Shutdown, Type, [ec_genet_server]},
     LoggerChild = {ec_genet_logger, {ec_genet_logger, start_link, []},
                   Restart, Shutdown, Type, [ec_genet_logger]},

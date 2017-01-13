@@ -50,8 +50,7 @@
 
 %% @spec start(_StartMode,_StartArgs) -> {ok, Pid}
 start(_StartMode, _StartArgs) ->
-    Port = application:get_env(ec_genet, port, ?NCS_PORT),
-    case ec_genet_sup:start_link(Port) of
+    case ec_genet_sup:start_link() of
         {ok, Pid} ->
             {ok, Pid};
         Error ->

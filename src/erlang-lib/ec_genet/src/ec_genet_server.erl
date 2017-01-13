@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1,
+-export([start_link/0,
          reg_mapping/3, unreg_mapping/2,
          tctx_maapi_sock/1,tctx_maapi_thandle/1,convert_value/2, convert_path/1]).
 
@@ -23,14 +23,14 @@
 %%% API
 %%%===================================================================
 
-start_link(Port) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [Port], []).
+start_link() ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
-init([Port]) ->
+init([]) ->
     process_flag(trap_exit, true), % Triggers call to terminate/2
     TransDP = #confd_trans_cbs{
       init = fun s_init/1,
@@ -47,6 +47,7 @@ init([Port]) ->
       move_after      = fun move_after/3,
       callpoint       = ec_genet},
     
+    Port = application:get_env(ec_genet, port, ?NCS_PORT),
     {ok, M} = econfd_maapi:connect({127,0,0,1}, Port),
     {ok, Daemon} = econfd:init_daemon(transform, ?GENET_TRACE_LEVEL, user,
                                       M, {127,0,0,1}, Port),
