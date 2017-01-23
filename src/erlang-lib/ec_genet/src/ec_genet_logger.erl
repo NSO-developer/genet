@@ -75,7 +75,7 @@ process_state_update(LN, File, State) ->
     if is_pid(State#state.output) ->
             file:close(State#state.output);
        true -> ok end,
-    case file:open(File, [write, delayed_write]) of
+    case file:open(File, [append, delayed_write]) of
         {ok, Dev} ->
             %% perhaps levels changed too
             process_state_update(LN, File, State#state{output=Dev, filename=File});
