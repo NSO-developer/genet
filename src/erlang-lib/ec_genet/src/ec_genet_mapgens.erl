@@ -16,12 +16,15 @@
          pre_hook/2,post_hook/2,address_switch/2,leaf_list_map/3,
          guard_by_value/3,merge_mappings/2,compose/2,
          existence_to_list_instance/1,leaf_to_list_instance/2,node_to_list_instance_subnode/2,
-         leaf_list_to_leaf/1,compose_lists/1]).
+         leaf_list_to_leaf/1,compose_lists/1,mappings_switch/4]).
 
 -include_lib("econfd/include/econfd.hrl").
 -include_lib("econfd/include/econfd_errors.hrl").
 -include("ec_genet.hrl").
 -include("debug_macros.hrl").
+
+-type path() :: [any()].
+-type path_or_map() :: path() | #mappings{}.
 
 %% @spec constant(Path, Value) -> mappings()
 %%
@@ -382,11 +385,14 @@ post_hook(LLPathOrMap, HookMap) ->
 
 %% @spec address_switch(Path | Map, Path | Map) -> mappings()
 %%
-%% @doc Mapping a single leaf to a pair of leaves, e.g. in a choice.  The value for `set'
-%% is supposed to be pair `{X, Val}' where `X' is either true or false to indicate the
-%% first or the second of the leaves; return value of `get' is similarly `{X, Val}' to
-%% indicate from which of the two paths the value was read, or `not_found' if none of the
-%% LL leaves exists.
+%% @doc Mapping a single leaf to a pair of leaves, e.g. in a choice.
+%% The value for `set' is supposed to be pair `{X, Val}' where `X' is
+%% either true or false to indicate the first or the second of the
+%% leaves; return value of `get' is similarly `{X, Val}' to indicate
+%% from which of the two paths the value was read, or `not_found' if
+%% none of the LL leaves exists.  If the mechanism for determining the
+%% correct address (mapping) cannot be based only on the value, try
+%% using {@link mappings_switch/4} instead.
 address_switch(PathOrMapTrue, PathOrMapFalse) ->
     #mappings{nested=[], % will be rewritten
               fupval=fun(_,_,[not_found,not_found],_) -> not_found;
@@ -579,3 +585,27 @@ compose_list(M, Active) ->
     %% we have double nesting here; this is to be sure that fupkeys calls are honored
     #mappings{fupkeys=fun(_,_,[K],_) -> process_composed_keys(K, M, Active) end,
               nested=[M]}.
+
+%% @doc Switching between two variant mappings.  Similar to
+%% `address_switch', but in this case the selection of which path or
+%% mapping should be used is a "switching function", which is invoked
+%% before every operation with the current transaction context and HL
+%% path.
+-spec mappings_switch(HLPath::path(), path_or_map(), path_or_map(),
+                      fun((#confd_trans_ctx{}, HLPath::path()) -> true | false)) ->
+                               #mappings{}.
+mappings_switch(HLPath, PathOrMap1, PathOrMap2, SwitchFun) ->
+    Map1 = path_to_mappings(PathOrMap1),
+    Map2 = path_to_mappings(PathOrMap2),
+    #mappings{
+       fopmap=fun(Tctx, Op, _, Arg, _) ->
+                      case SwitchFun(Tctx, HLPath) of
+                          true -> {Tctx, Op, HLPath, [Arg], #mappings{nested=[Map1]}};
+                          false -> {Tctx, Op, HLPath, [Arg], #mappings{nested=[Map2]}}
+                      end
+              end,
+       fupval=ec_genet:value_fun(fun([X]) -> X end),
+       fupkeys=ec_genet:value_fun(fun([X]) -> X end),
+       nested=[Map1, Map2]
+      }.
+
