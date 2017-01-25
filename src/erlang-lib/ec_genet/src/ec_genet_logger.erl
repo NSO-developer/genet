@@ -7,11 +7,12 @@
 
 -export([start_link/0]).
 
--export([log/4]).
+-export([before_advice/1,after_advice/2,throw_advice/2,log/4]).
 
 -include_lib("econfd/include/econfd.hrl").
 -include_lib("econfd/include/econfd_errors.hrl").
 -include("ec_genet.hrl").
+-include("log_groups.hrl").
 
 -define(SERVER, ?MODULE).
 
@@ -50,6 +51,20 @@ terminate(Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+%%%%%%%%%
+%%% Logging API functions
+%%%%%%%%%
+
+before_advice(Desc) ->
+    request({before_advice, Desc}).
+
+after_advice(Desc, R) ->
+    request({after_advice, Desc, R}).
+
+throw_advice(Desc, {Exc,R}) ->
+    request({throw_advice, Desc, {Exc, R}}),
+    erlang:raise(Exc, R, erlang:get_stacktrace()).
+
 log(Level, Module, Line, Args) ->
     request({log, Level, Module, Line, Args}).
 
@@ -60,6 +75,15 @@ log(Level, Module, Line, Args) ->
 request(Request) ->
     gen_server:cast(?SERVER, {Request, os:timestamp()}).
 
+process({{before_advice, [M, Fn, Line, Args]}, Timestamp}, State) ->
+    format_log_level(State, Timestamp, fix_location(M, Fn, Line), enter, [Args]),
+    State;
+process({{after_advice, [M, Fn, Line, _Args], R}, Timestamp}, State) ->
+    format_log_level(State, Timestamp, fix_location(M, Fn, Line), exit, [R]),
+    State;
+process({{throw_advice, [M, Fn, Line, _Args], {Exc, R}}, Timestamp}, State) ->
+    format_log_level(State, Timestamp, fix_location(M,Fn,Line), exception, [Exc, R]),
+    State;
 process({{log, Level, Module, Line, Args}, Timestamp}, State) ->
     output_log(State, Timestamp, {'',Level}, '', location(Module, Line), Args),
     State;
@@ -95,6 +119,36 @@ eclog(trace, Format, Args) ->
 %%% Logging functions
 %%%%%%%%%
 
+format_log_level(State, Timestamp, Location={Module,Function,_Line}, Event, Args) ->
+    Level = lookup_level(Module, Function, Event),
+    output_log(State, Timestamp, Level, Event, Location, Args).
+
+%% @doc For given function and event type, lookup log level.  For
+%% event type `exception` it is always `warn`.
+-spec lookup_level(Module::atom(), Function::atom(), Event::atom()) ->
+                          {LogGroup::atom(), Level::atom()}.
+lookup_level(Module, Function, exception) ->
+    {Group,_Level} = lookup_level(Module, Function),
+    {Group,warn};
+lookup_level(Module, Function, _Event) ->
+    lookup_level(Module, Function).
+
+%% TODO: convert this to dict lookup
+lookup_level(Module, Function) ->
+    case lists:dropwhile(fun ({_Group, ModFuns}) -> not(is_in_group(Module, Function, ModFuns)) end,
+                         ?LOG_GROUPS) of
+        [{Group, _ModFuns}|_] ->
+            case lists:keyfind(Group, 1, ?LOG_LEVELS) of
+                false -> {unknown,unknown};
+                GL -> GL
+            end;
+        [] -> % may happen for throws
+            {unknown,unknown}
+    end.
+
+is_in_group(Module, Function, ModFuns) ->
+    [Mod || {Mod, Funs} <- ModFuns, Mod =:= Module andalso lists:member(Function, Funs)] /= [].
+
 %% @doc Format new log entry and write it to the output file.
 -spec output_log(#state{},
                  os:timestamp(),
@@ -103,18 +157,25 @@ eclog(trace, Format, Args) ->
                  {Module::atom(), Function::atom(), Line::integer()},
                  Args::[term(),...]) ->
                         ok.
-output_log(State, Timestamp, {Group,Level}, Event, Location, [Format, Args]) ->
-    Levels = State#state.levels,
-    %%eclog(trace, ">>> ec_genet_logger Levels=~p loglevel=~p",[Levels, get(ec_genet_loglevel)]),
-    LogEntry = lists:flatten(io_lib:format(Format, Args)),
+output_log(#state{levels=Levels, output=Dev}, Timestamp, {Group,Level}, Event, Location, Args) ->
     case lists:member(Level, Levels) of
         true ->
-            highlight_line(State, Group, Level, Event,
-                           io_lib:format("~s [~p;~p] ~s ~s",
-                                         [format_timestamp(Timestamp), Level, Group, format_location(Location), LogEntry]));
+            do_output_log(Dev, Timestamp, Group, Level, Event, Location, Args);
         _ ->
             ok
     end.
+
+do_output_log(Dev, Timestamp, Group, Level, Event, Location, Args) ->
+    LogList = case Event of
+                  exception -> [R,Exc] = Args, throw_log(R, Exc);
+                  enter -> [Arg] = Args, enter_log(Arg);
+                  exit -> [Ret] = Args, exit_log(Ret);
+                  _ -> [Format, Arg] = Args, io_lib:format(Format, Arg)
+              end,
+    LogEntry = lists:flatten(LogList),
+    highlight_line(Dev, Group, Level, Event,
+                   io_lib:format("~s [~p;~p] ~s ~s",
+                                 [format_timestamp(Timestamp), Level, Group, format_location(Location), LogEntry])).
 
 format_location({Module, '', Line}) ->
     io_lib:format("~p:~p", [Module, Line]);
@@ -124,11 +185,11 @@ format_location({Module, Function, Line}) ->
 location(Module, Line) ->
     {Module,'',Line}.
 
-highlight_line(#state{output=none}, _, _, _, _) ->
+highlight_line(none, _, _, _, _) ->
     ok;
-highlight_line(#state{output=Dev}, dpapi, _, enter, Line) ->
+highlight_line(Dev, dpapi, _, enter, Line) ->
     io:format(Dev, "~n~s~n~n~s~n", [lists:duplicate(80, $*), Line]);
-highlight_line(#state{output=Dev}, _,_,_,Line) ->
+highlight_line(Dev, _,_,_,Line) ->
     io:format(Dev, "~s~n", [Line]).
 
 format_timestamp(Timestamp) ->
@@ -136,3 +197,77 @@ format_timestamp(Timestamp) ->
     {{Yr,Mn,D},{Hr,Min,Sec}} = calendar:now_to_local_time(Timestamp),
     io_lib:format("~4..0w-~2..0w-~2..0w::~2..0w:~2..0w:~2..0w.~3..0w",
                   [Yr, Mn, D, Hr, Min, Sec, USec div 1000]).
+
+fix_location(Module, Fn, Line) ->
+    {Module,fix_funcname(Fn),Line}.
+
+fix_funcname(Fn) ->
+    Fnl = atom_to_list(Fn),
+    list_to_atom(lists:sublist(Fnl, length(Fnl)-2)).
+
+enter_log(Args) ->
+    case lists:map(fun format_arg/1, Args) of
+        [] ->
+            "{enter, []}";
+        [Af|Afs] ->
+            io_lib:format("{enter, [~s~s]}", [Af, lists:map(fun (Arg) -> ", " ++ Arg end, Afs)])
+    end.
+
+exit_log(RetVal) ->
+    io_lib:format("{exit, ~s}", [format_arg(RetVal)]).
+
+throw_log(R, Exc) ->
+    io_lib:format("{exception, {~p,~p}}", [R, Exc]).
+
+format_arg(A) ->
+    format_val(A, 0).
+
+-define(MAX_DEPTH, 7).
+
+%% @doc Format a value for logging.  Recurses into tuples, lists, and
+%% (some) structures up to given recursion level.  Note that the
+%% return value may actually be a deep list.
+-spec format_val(Value::term(), Depth::integer()) -> string().
+format_val(#confd_trans_ctx{},_) ->
+    "tctx";
+format_val(#maapi_cursor{},_) ->
+    "cursor";
+format_val(#mappings{}, ?MAX_DEPTH) ->
+    "#mappings{...}";
+format_val(Map=#mappings{},L) ->
+    Fields = lists:zip(record_info(fields, mappings), tl(tuple_to_list(Map))),
+    FormFields = [format_mapfield(F,L) || F <- Fields],
+    io_lib:format("#mappings{~s}", [string:join(lists:filter(fun (Str) -> Str /= "" end, FormFields),
+                                                ", ")]);
+format_val(T, ?MAX_DEPTH) when is_list(T) ->
+    "[...]";
+format_val([A|B], L) when not is_list(B) ->
+    io_lib:format("[~s|~s]", [format_val(A, L+1), format_val(B, L+1)]);
+format_val([], _) ->
+    "[]";
+format_val(Vals, L) when is_list(Vals) ->
+    case io_lib:printable_list(Vals) of
+        true ->
+            Vals;
+        _ ->
+            case catch length(Vals) of
+                {'EXIT', _} ->
+                    "[" ++ io_lib:format("[~s|~s]", 
+                                         [format_val(hd(Vals), L+1), 
+                                          format_val(tl(Vals), L+1)]);
+                _ ->
+                    io_lib:format("[~s]", [string:join([format_val(V, L+1) || V <- Vals], ", ")])
+            end
+    end;
+format_val(T, ?MAX_DEPTH) when is_tuple(T) ->
+    "{...}";
+format_val(Vals, L) when is_tuple(Vals) ->
+    io_lib:format("{~s}", [string:join([format_val(V, L+1) || V <- tuple_to_list(Vals)], ", ")]);
+format_val(Arg,_) ->
+    %% FIXME: this may yield too long expressions and break lines
+    io_lib:format("~p", [Arg]).
+
+format_mapfield({_,none},_) ->
+    "";
+format_mapfield({Name,Value},L) ->
+    io_lib:format("~p=~s", [Name, format_val(Value, L+1)]).

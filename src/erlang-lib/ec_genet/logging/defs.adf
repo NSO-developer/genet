@@ -1,0 +1,5 @@
+% -*- mode: erlang -*-
+
+%% defs.adf
+
+advice_utils:log_aspects(Aspect,Advice,Pointcut).

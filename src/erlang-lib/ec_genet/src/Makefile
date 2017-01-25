@@ -5,7 +5,7 @@ APP_DIR    = $(shell dirname $(CURDIR))
 APP_NAME   = $(shell basename $(APP_DIR))
 ERL_FILES  = $(wildcard *.erl)
 MODULES    = $(ERL_FILES:%.erl=%)
-EBIN_FILES = $(MODULES:%=../ebin/%.beam) ../ebin/$(APP_NAME).app ../ebin/loglevels.conf
+EBIN_FILES = $(MODULES:%=../ebin/%.beam) ../ebin/$(APP_NAME).app
 YANG_DIR   = ../../../yang
 YANGS	   = $(filter-out %-ann.yang, $(wildcard $(YANG_DIR)/*.yang))
 NS_DIR	   = ../ns
@@ -42,9 +42,6 @@ clean:
 
 ../ebin/%.app: %.app.src ../vsn.mk Makefile
 	perl -e $(APPSCRIPT) "$(VSN)" $(MODULES) < $< > $@
-
-../ebin/loglevels.conf: loglevels.conf
-	/bin/cp $< $@
 
 ../ebin/%.beam: %.erl
 	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<

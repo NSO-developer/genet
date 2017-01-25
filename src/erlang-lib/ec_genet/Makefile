@@ -1,4 +1,4 @@
-SUBDIRS = src
+SUBDIRS = logging src
 
 all clean:
 	@set -e ; \

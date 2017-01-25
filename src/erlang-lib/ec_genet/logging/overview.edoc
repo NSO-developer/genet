@@ -1,0 +1,357 @@
+%%
+%% Copyright (C) 2011 by krasnop@bellsouth.net (Alexei Krasnopolski)
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License. 
+%%
+
+@author Alexei Krasnopolski <krasnop@bellsouth.net> [http://crasnopolski.com]
+@copyright 2011 Alexei Krasnopolski
+@doc 
+<h5>Introduction</h5>
+	The project is a try to implement AOP for Erlang platform. AOP approach has significant
+success in area of web application design and others for implementation
+a profiling, logging and debugging support, transaction management, security management, 
+different kinds of interceptors and so on. Good example of successful AOP using is
+Spring framework. 
+<h5>Terminology</h5>
+	Before starting an explanation of using the tool, lets refresh memory about generic
+AOP terms follow <a href="http://static.springsource.org/spring/docs/2.0.8/reference/aop.html">Aspect Oriented Programming with Spring</a>.
+Not all principal of AOP are implemented in the project so we will discuss only following ones.
+Definitions are slightly changed to fit Erlang reality. 
+
+<dl>
+	<dt>Join point</dt><dd>Imagine that our program or application is a space of function definitions. 
+Each function is a point or entry of execution and join point is an activation 
+of the entry during execution process. Only function entry can be join point.</dd>
+	<dt>Pointcut</dt><dd>Regular expression that matches join point. A pointcut 
+can match one or set of join points.</dd>
+	<dt>Advice</dt><dd>Function that is executed in defined join point. Advice is 
+generally defined as module name and function name. Advice can be different types: 
+it can run before execution of join point function, it can run after join point
+function (after return, after catch of an exception or after final block) or it
+can run around of target join poin function.</dd>
+	<dt>Target</dt><dd>Function, module or set of modules for these we want to apply the AOP tool.</dd>
+	<dt>Aspect</dt><dd>Aspect defines combination of advice and set of corresponded pointcuts. Advice is main 
+element of AOP configuration and controls how and where apply the advice function to target source code.</dd>
+	<dt>Proxy</dt><dd>Function that replaces target function and implements advice calling.</dd>
+	<dt>Weaving</dt><dd>Process of matching aspects to target source code and generating proxies 
+instead of target function.</dd>
+</dl>
+
+Figure below illustrates the discussed terms.<br/>
+<img src="aop-11.png" border="0"/>
+
+<h5>Getting started</h5>
+To start with the AOP tool you have to complete at least first step from two ones below:
+<ol>
+<li>Install Erlang [http://www.erlang.org/download.html].</li>
+<li>Install Eclipse IDE [http://www.eclipse.org/] with Erlide plugin [http://erlide.sourceforge.net/]. 
+Although this is optional, I am doing developing of the software 
+using these wonderful tools and highly recommend ones.</li>
+</ol>
+
+Let's create very simple example project to look over main features of the project.
+This example demonstrates profiling/debugging with AOP. The example code already exists in
+erl.aop project folder:
+<pre>
+erl.aop
+  |
+  |== ebin
+  |== examples
+  |     |== aspects
+  |     |     |---- advices.erl
+  |     |     |---- defs.adf
+  |     |
+  |     |== target
+  |     |     |---- program.erl
+  |     |
+  |     |---------- run_program.erl
+  |
+  |== include
+  |     |---------- aop.hrl
+  |
+  |== src
+        |---------- aop.erl
+        |---------- fun_proxy.erl
+        |---------- weaver.erl
+
+</pre>
+Before starting with example we need to prepare the project. First let's open Erlang
+console (eshell) and change current dir to the project ebin folder:
+<pre>
+1> c:cd("/home/alexei/eclipse/data/workspace/erl.aop/ebin").
+/home/alexei/eclipse/data/workspace/erl.aop/ebin
+</pre>
+Next step is compiling source files from src folder:
+<pre>
+2> c("../src/aop.erl").
+{ok,aop}
+3> c("../src/fun_proxy.erl").
+{ok,fun_proxy}
+4> c("../src/weaver.erl").
+{ok,weaver}
+</pre>
+Now we can go to accomplish a few following steps to make AOP works.
+<ol>
+  <li>Choose the modules and functions for these we want to apply advices. 
+Suppose we have Erlang module with 2 functions - process_message/1 and calc_service/2 
+and one more run/0 that calls above function with different arguments
+(see folder examples under the base directory of the project):
+<pre>
+-module(program).
+
+-export([calc_service/2, process_message/1, run/0]).
+
+calc_service(A, B) -&gt; A + B.
+
+process_message(M) -&gt; string:to_upper(M).
+
+run() -&gt;
+	calc_service(1, 0),
+	calc_service(2, 2),
+	process_message("Add 3 to 5"),
+	process_message("Message to process"),
+	ok
+.	
+</pre>
+	</li>
+  <li>Create advice module with 2 functions - before_advice/1 and after_advice/2:
+<pre>
+-module(advices).
+
+-export([before_advice/1, after_advice/2]).
+
+before_advice([M, F, Args]) -&gt;
+	io:format("&gt;&gt;&gt; before function ~p:~p~n arguments:~n", [M, F]),
+	[io:format(" ~p~n", [Arg])|| Arg &lt;- Args]
+.
+
+after_advice([M, F, _Args], R) -&gt;
+	io:format("&lt;&lt;&lt; after function ~p:~p~n return:~p~n", [M, F, R])
+.
+</pre>
+  </li>
+  <li>Create configuration file that describes aspects we are going to apply to target source code:
+<pre>
+%% defs.adf
+[Aspect(
+	Advice(before, advices, before_advice),
+	[
+		Pointcut("program", "\\w*_service", "*", public)
+	]
+),
+Aspect( 
+	Advice(after_return, advices, after_advice), 
+	[
+		Pointcut("program", "process\\w*", "1", public)
+	]
+)]
+.
+</pre>
+  </li>
+  <li>Compile source code with AOP weaving:
+<pre>
+2> aop:compile(["../examples/target"], ["../examples/aspects"]).
+Sources = ["../examples/program.erl"] 
+Config files  = ["../examples/aspects/defs.adf"]
+Module name = program is weaved.         Warnings = []
+ok
+</pre>
+  </li>
+  <li>Run target module to test AOP advices:
+<pre>
+3> program:run().
+&gt;&gt;&gt; before function program:calc_service_@
+ arguments:
+ 1
+ 0
+&gt;&gt;&gt; before function program:calc_service_@
+ arguments:
+ 2
+ 2
+&lt;&lt;&lt; after function program:process_message_@
+ return:"ADD 3 TO 5"
+&lt;&lt;&lt; after function program:process_message_@
+ return:"MESSAGE TO PROCESS"
+ok
+</pre>
+  </li>
+</ol>
+
+<h5>How it works</h5>
+
+We have a original source code as a target for AOP weaving and we have configuration file/files 
+with set of aspects these define advices and advice's pointcuts. During compiling stage Erlang
+compiler is using parse transform compiler plugin that provides AOP weaving:
+<pre>
+
+          ----------            --------------------------
+         | defs.adf |----->----| weaver:parse_transform/2 |
+          ----------            --------------------------
+                                           |
+                                           | --- parse_transform
+                                           |
+   ----------------------           -----------------           --------------------
+  | original source code |---->----| ERLANG Compiler |---->----| AOP adviced source |
+   ----------------------           -----------------           --------------------
+</pre>
+Table below describes how weaver transforms original function to proxy function with embedded
+calling of advice functions.
+<table border="1" width="100%">
+	<thead style="color: blue; font-weight: bold;">Target function transformation during weaving process</thead>
+  <tr style="background-color: #00eeee;">
+    <th>Target function<br/>(original source code)</th>
+    <th>Target function after weaving</th>
+  </tr>
+  <tr>
+    <td><pre>target_func(P1,P2) -> {body}.</pre></td>
+    <td><pre>target_func_@(P1,P2) -> {body}.</pre></td>
+  </tr>
+  <tr style="background-color: #00eeee;">
+    <th>Advice type</th>
+    <th>AOP proxy function after weaving</th>
+  </tr>
+  <tr>
+    <td>before</td>
+    <td><pre>target_func(P1,P2) ->
+  before_advice([M,F,[P1,P2]]),
+  target_func_@(P1,P2).</pre></td>
+  </tr>
+  <tr>
+    <td>after return</td>
+    <td><pre>target_func(P1,P2) ->
+  R = target_func_@(P1,P2),
+  after_advice([M,F,[P1,P2]], R), 
+  R.</pre></td>
+  </tr>
+  <tr>
+    <td>after throw</td>
+    <td><pre>target_func(P1,P2) ->
+  try
+    target_func_@(P1,P2)
+  catch
+    Ex:Rz -> after_advice([M,F,[P1,P2]],{Ex,Rz}),
+  end.</pre></td>
+  </tr>
+  <tr>
+    <td>after final</td>
+    <td><pre>target_func(P1,P2) -> 
+  try
+    target_func_@(P1,P2)
+  after
+    after_advice([M,F,[P1,P2]]),
+  end.</pre></td>
+  </tr>
+  <tr>
+    <td>around</td>
+    <td><pre>target_func(P1,P2) ->
+  erlang:apply(advice_module, arround_advice, 
+      [?MODULE, target_func_@, [P1,P2]]).</pre></td>
+  </tr>
+</table>
+
+<p>Advice functions have to obey some rules as explained below.</p>
+
+<table border="1" width="100%">
+	<thead style="color: blue; font-weight: bold;">Advice function specifications</thead>
+  <tr style="background-color: #00eeee;">
+    <th style="white-space: nowrap;">Advice type</th>
+    <th>Function specification</th>
+  </tr>
+  <tr>
+    <td>before</td>
+    <td><pre>@spec before_advice([M, F, Args]) -> any()
+  M = atom() - target module name
+  F = atom() - target function name
+  Args = list() - list of arguments of target function</pre></td>
+  </tr>
+  <tr>
+    <td>after return</td>
+    <td><pre>@spec after_advice([M, F, Args], R) -> any()
+  M = atom() - target module name
+  F = atom() - target function name
+  Args = list() - list of arguments of target function
+  R = any() - return value of target function</pre></td>
+  </tr>
+  <tr>
+    <td>after throw</td>
+    <td><pre>@spec after_advice([M, F, Args],{Ex,Rz}) -> any()
+  M = atom() - target module name
+  F = atom() - target function name
+  Args = list() - list of arguments of target function
+  Ex = term() - exception that is caught during target function execution. 
+  Rz = term() - reason of the exception</pre></td>
+  </tr>
+  <tr>
+    <td>after final</td>
+    <td><pre>@spec after_advice([M, F, Args]) -> any()
+  M = atom() - target module name
+  F = atom() - target function name
+  Args = list() - list of arguments of target function</pre></td>
+  </tr>
+  <tr>
+    <td>around</td>
+    <td><pre>@spec around_advice(M, F, Args) -> R
+  M = atom() - target module name
+  F = atom() - target function name
+  Args = list() - list of arguments of target function
+  R = any() - return value of target function
+The body of around_advice have to contain at least -
+  erlang:apply(M, F, Args)
+Around advice has to return a value that returns the call above.
+  </pre></td>
+  </tr>
+</table>
+
+Configuration file has extension *.adf (ADvice DeFinition). Content of the files is
+Erlang term - list of aspect tuples (#aspect{} record is defined in include/aop.hrl).
+Functions Aspect/2, Advice/2 and Pointcut/4 can be used inside adf file.
+<table border="1" width="100%">
+	<thead style="color: blue; font-weight: bold;">Aspect configuration</thead>
+  <tr style="background-color: #00eeee;">
+    <th style="white-space: nowrap;">Configuration element<br/>(function)</th>
+    <th>Arguments</th>
+  </tr>
+  <tr>
+    <td style="white-space: nowrap;">Aspect(Advice, Pointcut)</td>
+    <td><pre>Advice - tuple that defines the advice; 
+Pointcut - list that defines list of pointcuts for the advice.</pre></td>
+  </tr>
+  <tr>
+    <td style="white-space: nowrap;">Advice(Module, Function)</td>
+    <td><pre>Module = atom() - name of advice module; 
+Function = atom() - name of advice function.</pre></td>
+  </tr>
+  <tr>
+    <td style="white-space: nowrap;">Pointcut(Module, Function, Arity, Scope)</td>
+    <td><pre>Module = string() - regular expression that matches module names of desired joint points,
+    ex.: "connection" - defines joint point module 'connection',
+         "\\w*_db" - defines all joint point modules with suffix '_db'; 
+Function = string() - regular expression that matches function names of desired joint points;
+    ex.: "calc" - defines joint point function 'calc',
+         "\\w*_service" - defines all joint point functions with suffix '_service'; 
+Arity = string() | integer() - expression that matches arity of joint point functions,
+    ex.: 1 - defines arity of joint point function equals 1,
+         * - defines any arity,
+         "2-4" - defines arity &gt;= 2 and &lt;= 4.
+Scope = public | local | global - match for exported function (public), private (local) function or both (global).
+         </pre></td>
+  </tr>
+</table>
+
+@reference [http://static.springsource.org/spring/docs/2.0.8/reference/aop.html] - Spring framework.
+@see aop 
+@since 2011-07-15
+@title AOP for Erlang.
+@version {@version}
+

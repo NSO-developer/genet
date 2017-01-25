@@ -1,0 +1,30 @@
+#!/usr/bin/env escript
+% -*- mode: erlang -*-
+
+main([File,OutDir|Opts]) ->
+    {Pas, Incs} = process_opts(Opts, {[], []}),
+    code:add_pathsz(Pas),
+    case catch aop:compile_one_file(File, [filename:dirname(escript:script_name())],
+                                    [{outdir, OutDir}|lists:map(fun (Dir) -> {i, Dir} end, Incs)]) of
+        {ok, _} -> ok;
+        {ok, _, _} -> ok;
+        Err ->
+            io:format("~p~n", [Err]),
+            halt(1)
+    end.
+
+process_opts([], {Pas, Incs}) ->
+    {lists:reverse(Pas), lists:reverse(Incs)};
+process_opts(["-pa"|Opts], {Pas, Incs}) ->
+    {PaDirs, Rest} = split_opts(Opts),
+    process_opts(Rest, {lists:reverse(PaDirs)++Pas, Incs});
+process_opts(["-i"|Opts], {Pas, Incs}) ->
+    {IncDirs, Rest} = split_opts(Opts),
+    process_opts(Rest, {Pas, lists:reverse(IncDirs) ++ Incs});
+process_opts([InvOpt|_], _) ->
+    io:format("Invalid option: ~p~n", [InvOpt]),
+    halt(1).
+
+split_opts(Opts) ->
+    {Dirs, Rest} = lists:splitwith(fun (Opt) -> hd(Opt) /= $- end, Opts),
+    {[filename:absname(Dir) || Dir <- Dirs], Rest}.
