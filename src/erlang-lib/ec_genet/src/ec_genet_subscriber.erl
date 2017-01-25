@@ -71,13 +71,13 @@ eclog(trace, Format, Args) ->
 %%%%%%%%%
 
 subscriber() ->
-    %% FIXME: unsupervised; port hard-wired
-    update_conf(?NCS_PORT),
-    {ok, SubscriberSock} = econfd_cdb:connect({127,0,0,1}, ?NCS_PORT),
+    Port = application:get_env(ec_genet, port, ?NCS_PORT),
+    update_conf(Port),
+    {ok, SubscriberSock} = econfd_cdb:connect({127,0,0,1}, Port),
     {ok, Sub} = econfd_cdb:subscribe_session(SubscriberSock),
     {ok, _} = econfd_cdb:subscribe(Sub, 1, "/ec-genet/logging"),
     ok = econfd_cdb:subscribe_done(Sub),
-    proc_lib:spawn_link(fun() -> subscribe_loop(?NCS_PORT, Sub) end).
+    proc_lib:spawn_link(fun() -> subscribe_loop(Port, Sub) end).
 
 subscribe_loop(Port, Sub) ->
     try
@@ -89,7 +89,7 @@ subscribe_loop(Port, Sub) ->
 
 -define(LOGPATH, [logging, [?genet__ns_uri|'ec-genet']]).
 
-reader([Point], Port) ->
+reader([_Point], Port) ->
     update_conf(Port),
     ?CDB_DONE_PRIORITY.
 
