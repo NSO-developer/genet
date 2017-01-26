@@ -23,6 +23,11 @@ ERLC_FLAGS := \
 # jlindbla: Turned logging off, which gave some warnings, so turned off warnings as errors
 #	+warnings_as_errors \
 
+ifndef NO_AOP_LOGGING
+ERLC_FLAGS += '+{parse_transform,aop}' '+{aop_config_dir, "../logging"}'
+endif
+
+
 APPSCRIPT = '$$vsn=shift; $$mods=""; while(@ARGV){ $$_=shift; s/^([A-Z].*)$$/\'\''$$1\'\''/; $$mods.=", " if $$mods; $$mods .= $$_; } while(<>) { s/%VSN%/$$vsn/; s/%MODULES%/$$mods/; print; }'
 
 all: $(NCS_DIR)/erlang/econfd/ebin $(EBIN_FILES)
