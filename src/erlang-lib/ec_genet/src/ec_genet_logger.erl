@@ -16,7 +16,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {output=none, filename=none, levels=[]}).
+-record(state, {output=none, filename=none, levels=[], groups=dict:new()}).
 -define(ALL_LEVELS, [debug, info, note, warn, error]).  % ordering is important
 
 start_link() ->
@@ -25,9 +25,20 @@ start_link() ->
 init(_Args) ->
     process_flag(trap_exit, true),
     %% initial config read in the subscriber
-    ConfState = #state{},
+    ConfState = #state{groups=process_log_groups()},
     eclog(info, "logger started", []),
     {ok, ConfState}.
+
+process_log_groups() ->
+    GroupDeepList = lists:map(fun process_log_group/1, ?LOG_LEVELS),
+    dict:from_list(lists:flatten(GroupDeepList)).
+
+process_log_group({Group, Level}) ->
+    [process_log_group_module(Group, Level, Module, Funs) ||
+        {Module, Funs} <- proplists:get_value(Group, ?LOG_GROUPS, [])].
+
+process_log_group_module(Group, Level, Module, Funs) ->
+    [{{Module, Fun}, {Group, Level}} || Fun <- Funs].
 
 handle_call(getstate, _From, State) ->
     %% debugging only
@@ -120,34 +131,25 @@ eclog(trace, Format, Args) ->
 %%%%%%%%%
 
 format_log_level(State, Timestamp, Location={Module,Function,_Line}, Event, Args) ->
-    Level = lookup_level(Module, Function, Event),
+    Level = lookup_level(State#state.groups, Module, Function, Event),
     output_log(State, Timestamp, Level, Event, Location, Args).
 
 %% @doc For given function and event type, lookup log level.  For
 %% event type `exception` it is always `warn`.
--spec lookup_level(Module::atom(), Function::atom(), Event::atom()) ->
+-spec lookup_level(Groups::dict(), Module::atom(), Function::atom(), Event::atom()) ->
                           {LogGroup::atom(), Level::atom()}.
-lookup_level(Module, Function, exception) ->
-    {Group,_Level} = lookup_level(Module, Function),
+lookup_level(Groups, Module, Function, exception) ->
+    {Group,_Level} = lookup_level(Groups, Module, Function),
     {Group,warn};
-lookup_level(Module, Function, _Event) ->
-    lookup_level(Module, Function).
+lookup_level(Groups, Module, Function, _Event) ->
+    lookup_level(Groups, Module, Function).
 
 %% TODO: convert this to dict lookup
-lookup_level(Module, Function) ->
-    case lists:dropwhile(fun ({_Group, ModFuns}) -> not(is_in_group(Module, Function, ModFuns)) end,
-                         ?LOG_GROUPS) of
-        [{Group, _ModFuns}|_] ->
-            case lists:keyfind(Group, 1, ?LOG_LEVELS) of
-                false -> {unknown,unknown};
-                GL -> GL
-            end;
-        [] -> % may happen for throws
-            {unknown,unknown}
+lookup_level(Groups, Module, Function) ->
+    case dict:find({Module, Function}, Groups) of
+        {ok, Value} -> Value;
+        error -> {unknown, unknown}
     end.
-
-is_in_group(Module, Function, ModFuns) ->
-    [Mod || {Mod, Funs} <- ModFuns, Mod =:= Module andalso lists:member(Function, Funs)] /= [].
 
 %% @doc Format new log entry and write it to the output file.
 -spec output_log(#state{},
@@ -252,8 +254,8 @@ format_val(Vals, L) when is_list(Vals) ->
         _ ->
             case catch length(Vals) of
                 {'EXIT', _} ->
-                    "[" ++ io_lib:format("[~s|~s]", 
-                                         [format_val(hd(Vals), L+1), 
+                    "[" ++ io_lib:format("[~s|~s]",
+                                         [format_val(hd(Vals), L+1),
                                           format_val(tl(Vals), L+1)]);
                 _ ->
                     io_lib:format("[~s]", [string:join([format_val(V, L+1) || V <- Vals], ", ")])

@@ -46,7 +46,7 @@ init([]) ->
       remove          = fun delete/2,
       move_after      = fun move_after/3,
       callpoint       = ec_genet},
-    
+
     Port = application:get_env(ec_genet, port, ?NCS_PORT),
     {ok, M} = econfd_maapi:connect({127,0,0,1}, Port),
     {ok, Daemon} = econfd:init_daemon(transform, ?GENET_TRACE_LEVEL, user,
@@ -121,11 +121,11 @@ get_mappings(HLPath) ->
             none ->
                 ?LOGWARN("Lookup of HLPath does not match any registered module, using null map", HLPath),
                 fun(_) -> none end;
-            NormalMappingFun -> 
+            NormalMappingFun ->
                 ?LOGINFO("Mapping module used", NormalMappingFun),
                 NormalMappingFun
         end,
-    try 
+    try
         get_mapping_record(MappingFun,HLPath)
     catch
         Reason:Error ->
@@ -261,7 +261,7 @@ set_case(Tctx, HLPath, Choice, Case) ->
 
 throw_callmap_error(CallmapError,CallmapReason,Name) ->
     Trace = erlang:get_stacktrace(),
-    FileLine = 
+    FileLine =
         case Trace of
             [{_,_,_,[{file,FName},{line,FLine}]}|_] ->
 
@@ -320,37 +320,6 @@ throw_callmap_error(CallmapError,CallmapReason,Name) ->
 %%% Internal functions
 %%%===================================================================
 
-get_current_loglevel(M, TH) ->
-    LogPath = ['confd-log-level','logging',['http://cisco.com/yang/cisco-ia'|'cisco-ia']],
-    LogLevel =
-        try 
-            case econfd_maapi:get_elem(M, TH, LogPath) of
-                {ok, EnumValue} ->
-                    {ok, StrVal} = econfd_schema:val2str({'http://cisco.com/yang/cisco-ia','syslog-severity'}, EnumValue),
-                    StrVal;
-                {error, ErrMsg} ->
-                    ErrorMessage = format_error(ErrMsg),
-                    ?LOGERR("Could not read log level from ConfD, using loglevel info for now", 
-                            LogPath, ErrorMessage),
-                    <<"info">>
-            end
-        catch
-            Error:Reason ->
-                %% Something is wrong with the logging subsystem, so simply print this:
-                io:format("Error in ec_genet_server:get_current_loglevel error=~p:~p~n",[Error,Reason]),
-                <<"info">>
-        end,
-    LogLevel.
-
-inform_about_loglevel(Tctx, LogLevel) ->
-    %% For self:
-    put(ec_genet_loglevel, LogLevel),
-    %% For Worker:
-    Worker = (Tctx#confd_trans_ctx.dx)#confd_daemon_ctx.worker_pid,
-    Worker ! {ec_genet_loglevel, LogLevel},
-    %%io:format(">>> ZZZ IWAL sent loglevel=~p, worker=~p~n",[LogLevel, Worker]),
-    ok.
-
 process_mapping(Op, Tctx, HLPath, Arg, Mappings) ->
     try
         Res = process_mapping_fexists(Op, Tctx, HLPath, Arg, Mappings),
@@ -366,10 +335,10 @@ process_mapping(Op, Tctx, HLPath, Arg, Mappings) ->
             {error, format_error(Msg)};
         Error:Reason ->
             Trace = erlang:get_stacktrace(),
-            FileLine = 
+            FileLine =
                 case Trace of
                     [{_,_,_,[{file,FName},{line,FLine}]}|_] ->
-                        
+
                         " at "++FName++":"++integer_to_list(FLine);
                     _ ->
                         ""
@@ -380,7 +349,7 @@ process_mapping(Op, Tctx, HLPath, Arg, Mappings) ->
 
 process_mapping_fexists(Op, Tctx, HLPath, Arg, Mappings) ->
     Extra = Mappings#mappings.extra,
-    %% If fexists is defined, call that first to decide 
+    %% If fexists is defined, call that first to decide
     %% whether there is any point in calling anything else
     case {Op, Mappings} of
         {get_elem, #mappings{fexists=Fexists}} when Fexists /= none ->
@@ -431,7 +400,7 @@ process_mapping_override(Op, Tctx, HLPath, Arg, Mappings) ->
             case Res of
                 {ok, not_found} -> not_found;
                 {ok, _} -> true;
-                Error -> 
+                Error ->
                     ?LOGERR("Caught exception in exists default call to get_elem mapping function", HLPath, Error),
                     not_found
             end;
@@ -457,9 +426,9 @@ process_mapping_override(Op, Tctx, HLPath, Arg, Mappings) ->
             {Choice, Case} = Arg,
             {ok, Ret} = ?CALLMAP(set_case,ok,Fcb,Tctx,HLPath,Choice,Case,Extra),
             Ret;
-       
+
         %% FIXME: implement additional functions; *_object/...
-        
+
         _ ->
             process_mapping_core(Op, Tctx, HLPath, Arg, Mappings)
     end.
@@ -475,7 +444,7 @@ process_mapping_core(Op, Tctx, HLPath, Arg, Mappings) ->
                     process_value(Op, Tctx, RawVal, Mappings, HLPath);
                 not_found ->
                     not_found;
-                {error,Error} -> 
+                {error,Error} ->
                     {error,Error}
             end;
         exists ->
@@ -486,7 +455,7 @@ process_mapping_core(Op, Tctx, HLPath, Arg, Mappings) ->
                     process_value(Op, Tctx, RawVal, Mappings, HLPath);
                 not_found ->
                     not_found;
-                {error,Error} -> 
+                {error,Error} ->
                     {error,Error}
             end;
         create ->
@@ -558,7 +527,7 @@ process_opmap(Op, Tctx, LLPath, Arg, Mappings) ->
     Path = path_rewrite(Op, Tctx, LLPath, Arg, Mappings),
     case Mappings of
         #mappings{fopmap=FopMap} when FopMap /= none ->
-            {ok, {RetTctx, RetOp, RetPath, RetArg, RetMappings}} = 
+            {ok, {RetTctx, RetOp, RetPath, RetArg, RetMappings}} =
                 ?CALLMAP(fopmap,{NewTctx, NewOp, NewPath, NewArg, NewMappings},FopMap,Tctx,Op,Path,Arg,Mappings),
             process_nested(RetOp, RetTctx, RetPath, RetArg, RetMappings);
         _ ->
@@ -571,7 +540,7 @@ process_nested(Op, Tctx, LLPath, NestingArg, Mappings) ->
             ?LOGMSG("Nesting multiple",LLPath, NestingArg),
             NestingResult =
                 {ok, lists:map(
-                       fun({NestedMapping,NthArg}) -> 
+                       fun({NestedMapping,NthArg}) ->
                                case process_mapping(Op, Tctx, LLPath, NthArg, NestedMapping) of
                                    {ok, Val} -> Val;
                                    ok -> ok;
@@ -585,7 +554,7 @@ process_nested(Op, Tctx, LLPath, NestingArg, Mappings) ->
             ?LOGMSG("Nesting single",LLPath, NestingArg),
             NestingResultSingle =
                 {ok, lists:map(
-                       fun(NestedMapping) -> 
+                       fun(NestedMapping) ->
                                case process_mapping(Op, Tctx, LLPath, NestingArg, NestedMapping) of
                                    {ok, Val} -> Val;
                                    ok -> ok;
@@ -655,7 +624,7 @@ process_value(Op, Tctx, RawVal, Mappings, HLPath) ->
                     ExpectedLength = length(Nested),
                     ?LOGERR("Bad return value from mapping function, expected list",
                             HLPath, ExpectedLength, RetVal);
-                {RetVal, #mappings{nested=Nested}} when is_list(RetVal), Nested /= none, 
+                {RetVal, #mappings{nested=Nested}} when is_list(RetVal), Nested /= none,
                                                         length(RetVal) /= length(Nested) ->
                     ExpectedLength = length(Nested),
                     ActualLength = length(RetVal),
@@ -702,9 +671,9 @@ default_ll_op(get_next, Tctx, Path, -1, Mappings) ->
 default_ll_op(get_next, _Tctx, _Path, Cursor, _Mappings) ->
     %% Cursor value /= -1 indicates start from the previous position
     Next = econfd_maapi:get_next(Cursor),
-    RawVal = 
+    RawVal =
         case Next of
-            done -> 
+            done ->
                 {ok, {false, undefined}};
             {ok, Keys, NewCursor} ->
                 {ok, {Keys, NewCursor}}
@@ -728,7 +697,7 @@ default_ll_op(get_elem, Tctx, Path, none, _Mappings) ->
             OkVal;
         {error, ErrMsg} ->
             ErrorMessage = format_error(ErrMsg),
-            ?LOGMSG("maapi:get_elem() returned an error; ignored, returning not_found", 
+            ?LOGMSG("maapi:get_elem() returned an error; ignored, returning not_found",
                     Path, ErrorMessage),
             not_found
     end;
@@ -740,7 +709,7 @@ default_ll_op(exists, Tctx, Path, none, _Mappings) ->
             OkVal;
         {error, ErrMsg} ->
             ErrorMessage = format_error(ErrMsg),
-            ?LOGMSG("maapi:exists() returned an error; ignored, returning not_found", 
+            ?LOGMSG("maapi:exists() returned an error; ignored, returning not_found",
                     Path, ErrorMessage),
             not_found
     end;
@@ -749,7 +718,7 @@ default_ll_op(create, Tctx, Path, _Val, _Mappings) ->
     TH = tctx_maapi_thandle(Tctx),
     case econfd_maapi:create(M, TH, convert_path(Path)) of
         ok -> ok;
-        {error, {2, _}} -> 
+        {error, {2, _}} ->
             ?LOGMSG("Creating already existing element, ignored", Path),
             ok
     end;
@@ -758,7 +727,7 @@ default_ll_op(delete, Tctx, Path, _Val, _Mappings) ->
     TH = tctx_maapi_thandle(Tctx),
     case econfd_maapi:delete(M, TH, convert_path(Path)) of
         ok -> ok;
-        {error, {1, _}} -> 
+        {error, {1, _}} ->
             ?LOGMSG("Deleting non-existent element, ignored", Path),
             ok
     end;
@@ -777,7 +746,7 @@ default_ll_op(get_case, Tctx, [LLChoice|Path], _HLChoice, _Mappings) ->
             not_found;
         {error, ErrMsg} ->
             ErrorMessage = format_error(ErrMsg),
-            ?LOGMSG("maapi:get_case() returned an error; ignored, returning not_found", 
+            ?LOGMSG("maapi:get_case() returned an error; ignored, returning not_found",
                     Path, ErrorMessage),
             not_found
     end;
