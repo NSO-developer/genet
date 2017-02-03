@@ -121,7 +121,7 @@ exists(Tctx, Path) ->
 num_instances(Tctx, Path) ->
     M = ec_genet_server:tctx_maapi_sock(Tctx),
     TH = ec_genet_server:tctx_maapi_thandle(Tctx),
-    Ret = 
+    Ret =
         case econfd_maapi:num_instances(M, TH, Path) of
             {ok, RawVal} ->
                 RawVal;
@@ -557,7 +557,8 @@ get_first_keyset(Tctx, Path) ->
     end.
 
 
-%% @spec joined_lists_next([Prefix], CommonPath, KeyConv) -> (Tctx, HLPath, Next, Extra) -> {false, undefined} | {Key, Next}
+%% @spec joined_lists_next([Prefix], CommonPath, KeyConv) -> (Tctx, HLPath, Next, Extra) ->
+%%                                {false, undefined} | {Key, Next}
 %% KeyConv = (Tctx, Prefix, key()) -> key()
 %%
 %% @doc Return a function that can be used for the `get_next' mappings field. The returned
@@ -821,7 +822,7 @@ keys_by_paths_get_next(Tctx,HLPath,[{Key,Path}|Rest],Extra) ->
 
 %% @spec constant_keyset_get_next(Tctx, Path, -1 | [{key(), Path}], [Path]) -> {value(), [{key(), Path}]}
 %%
-%% @doc `get_next` implementation returning set of key values given as extra argument.
+%% @doc `get_next' implementation returning set of key values given as extra argument.
 constant_keyset_get_next(Tctx, Path, -1, ValFun) when is_function(ValFun) ->
     constant_keyset_get_next(Tctx, Path, -1, ValFun(Tctx));
 constant_keyset_get_next(Tctx, Path, -1, List) ->

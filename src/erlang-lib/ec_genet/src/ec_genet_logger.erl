@@ -135,7 +135,7 @@ format_log_level(State, Timestamp, Location={Module,Function,_Line}, Event, Args
     output_log(State, Timestamp, Level, Event, Location, Args).
 
 %% @doc For given function and event type, lookup log level.  For
-%% event type `exception` it is always `warn`.
+%% event type `exception' it is always `warn'.
 -spec lookup_level(Groups::dict(), Module::atom(), Function::atom(), Event::atom()) ->
                           {LogGroup::atom(), Level::atom()}.
 lookup_level(Groups, Module, Function, exception) ->
