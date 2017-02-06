@@ -17,20 +17,23 @@ ERLC_FLAGS := \
 	+debug_info \
 	-I $(APP_DIR)/include \
 	-I $(APP_DIR)/ns \
+	+warnings_as_errors \
 	-pa $(NCS_DIR)/erlang/econfd/ebin \
 	-pa ../../ec_genet/ebin
 
-# jlindbla: Turned logging off, which gave some warnings, so turned off warnings as errors
-#	+warnings_as_errors \
-
 ifndef NO_AOP_LOGGING
-ERLC_FLAGS += '+{parse_transform,aop}' '+{aop_config_dir, "../logging"}'
+ERLC_FLAGS += '+{parse_transform,aop}' '+{aop_config_dir, "logging"}'
 endif
 
 
 APPSCRIPT = '$$vsn=shift; $$mods=""; while(@ARGV){ $$_=shift; s/^([A-Z].*)$$/\'\''$$1\'\''/; $$mods.=", " if $$mods; $$mods .= $$_; } while(<>) { s/%VSN%/$$vsn/; s/%MODULES%/$$mods/; print; }'
 
-all: $(NCS_DIR)/erlang/econfd/ebin $(EBIN_FILES)
+all: $(NCS_DIR)/erlang/econfd/ebin logging_all $(EBIN_FILES)
+
+.PHONY: logging_all
+logging_all:
+	$(MAKE) -C logging all
+
 
 $(NS_DIR)/%.hrl: $(YANG_DIR)/%.yang
 	$(NCSC) --emit-hrl $@ $(addprefix -a , $(wildcard $(YANG_DIR)/$*-ann.yang)) \
@@ -44,6 +47,7 @@ $(NCS_DIR)/erlang/econfd/ebin:
 
 clean:
 	rm -f $(EBIN_FILES) $(NS_FILES) erl_crash.dump core* *~
+	$(MAKE) -C logging clean
 
 ../ebin/%.app: %.app.src ../vsn.mk Makefile
 	perl -e $(APPSCRIPT) "$(VSN)" $(MODULES) < $< > $@
