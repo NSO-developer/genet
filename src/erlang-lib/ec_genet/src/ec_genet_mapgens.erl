@@ -7,7 +7,7 @@
 
 -module(ec_genet_mapgens).
 -export([constant/2,constant/3,scale_factor/2,contract_factor/2,
-         offset_value/2,enumeration_map/2,choice_map/2,address_map/2,from_cases/2, 
+         offset_value/2,enumeration_map/2,choice_map/2,address_map/2,from_cases/2,
          mapping_table_funs/2, mapping_table_funs/1,
          enumeration_map/3,address_map/3,from_cases/3,
          exists_constant/2,sentinel_hl/2,sentinel_hl/3,sentinel_ll/2,sentinel_ll/3,
@@ -16,7 +16,7 @@
          pre_hook/2,post_hook/2,address_switch/2,leaf_list_map/3,
          guard_by_value/3,merge_mappings/2,compose/2,
          existence_to_list_instance/1,leaf_to_list_instance/2,node_to_list_instance_subnode/2,
-         leaf_list_to_leaf/1,compose_lists/1,mappings_switch/4]).
+         leaf_list_to_leaf/1,compose_lists/1,mappings_switch/3]).
 
 -include_lib("econfd/include/econfd.hrl").
 -include_lib("econfd/include/econfd_errors.hrl").
@@ -158,14 +158,14 @@ mapping_table_funs(HiLoPairs, LoHiPairs) ->
                true -> LToH1;
                false -> dict:append(not_found, not_found, LToH1)
            end,
-    UpFun = 
+    UpFun =
         fun(LLVal) ->
                 case dict:find(LLVal, LToH) of
                     {ok, HLVal} -> HLVal;
                     error -> ?LOGWARN("Unknown LLVal case", LLVal), LLVal
                 end
         end,
-    DnFun = 
+    DnFun =
         fun(HLVal) ->
                 case dict:find(HLVal, HToL) of
                     {ok, LLVal} -> LLVal;
@@ -392,7 +392,7 @@ post_hook(LLPathOrMap, HookMap) ->
 %% from which of the two paths the value was read, or `not_found' if
 %% none of the LL leaves exists.  If the mechanism for determining the
 %% correct address (mapping) cannot be based only on the value, try
-%% using {@link mappings_switch/4} instead.
+%% using {@link mappings_switch/3} instead.
 address_switch(PathOrMapTrue, PathOrMapFalse) ->
     #mappings{nested=[], % will be rewritten
               fupval=fun(_,_,[not_found,not_found],_) -> not_found;
@@ -591,14 +591,14 @@ compose_list(M, Active) ->
 %% mapping should be used is a "switching function", which is invoked
 %% before every operation with the current transaction context and HL
 %% path.
--spec mappings_switch(HLPath::path(), path_or_map(), path_or_map(),
+-spec mappings_switch(path_or_map(), path_or_map(),
                       fun((#confd_trans_ctx{}, HLPath::path()) -> true | false)) ->
                                #mappings{}.
-mappings_switch(HLPath, PathOrMap1, PathOrMap2, SwitchFun) ->
+mappings_switch(PathOrMap1, PathOrMap2, SwitchFun) ->
     Map1 = path_to_mappings(PathOrMap1),
     Map2 = path_to_mappings(PathOrMap2),
     #mappings{
-       fopmap=fun(Tctx, Op, _, Arg, _) ->
+       fopmap=fun(Tctx, Op, HLPath, Arg, _) ->
                       case SwitchFun(Tctx, HLPath) of
                           true -> {Tctx, Op, HLPath, [Arg], #mappings{nested=[Map1]}};
                           false -> {Tctx, Op, HLPath, [Arg], #mappings{nested=[Map2]}}
@@ -608,4 +608,3 @@ mappings_switch(HLPath, PathOrMap1, PathOrMap2, SwitchFun) ->
        fupkeys=ec_genet:value_fun(fun([X]) -> X end),
        nested=[Map1, Map2]
       }.
-
