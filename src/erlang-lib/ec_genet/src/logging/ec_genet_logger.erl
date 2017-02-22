@@ -235,14 +235,14 @@ format_val(#confd_trans_ctx{},_) ->
 format_val(#maapi_cursor{},_) ->
     "cursor";
 format_val(#mappings{}, ?MAX_DEPTH) ->
-    "#mappings{...}";
+    "#mappings{}";
 format_val(Map=#mappings{},L) ->
     Fields = lists:zip(record_info(fields, mappings), tl(tuple_to_list(Map))),
     FormFields = [format_mapfield(F,L) || F <- Fields],
     io_lib:format("#mappings{~s}", [string:join(lists:filter(fun (Str) -> Str /= "" end, FormFields),
                                                 ", ")]);
 format_val(T, ?MAX_DEPTH) when is_list(T) ->
-    "[...]";
+    "[]";
 format_val([A|B], L) when not is_list(B) ->
     io_lib:format("[~s|~s]", [format_val(A, L+1), format_val(B, L+1)]);
 format_val([], _) ->
@@ -262,9 +262,12 @@ format_val(Vals, L) when is_list(Vals) ->
             end
     end;
 format_val(T, ?MAX_DEPTH) when is_tuple(T) ->
-    "{...}";
+    "{}";
 format_val(Vals, L) when is_tuple(Vals) ->
     io_lib:format("{~s}", [string:join([format_val(V, L+1) || V <- tuple_to_list(Vals)], ", ")]);
+format_val(Fun, _) when is_function(Fun) ->
+    {name, FN} = erlang:fun_info(Fun, name),
+    io_lib:format("~p", [FN]);
 format_val(Arg,_) ->
     %% FIXME: this may yield too long expressions and break lines
     io_lib:format("~p", [Arg]).

@@ -16,7 +16,7 @@
 
 -define(ServerConvert,
         [convert_value,do_convert_value,convert_other,convert_int_value,convert_buf_value,
-         convert_enum_value]).
+         convert_key_values,convert_enum_value]).
 
 -define(GenetAux,
         [exists,get_elem_str,get_elem,get_case,set_elem_str,set_elem,create,

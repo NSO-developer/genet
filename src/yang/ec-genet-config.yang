@@ -1,5 +1,5 @@
 module ec-genet-config {
-  namespace "http://tail-f.com/ns/genet";
+  namespace "http://tail-f.com/ns/genet/config";
   prefix genet;
 
   typedef genet-log-level-type {
