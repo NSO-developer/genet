@@ -97,7 +97,13 @@ update_conf(Port) ->
     {ok, RSock} = econfd_cdb:connect({127,0,0,1}, Port),
     {ok, Cdb} = econfd_cdb:new_session(RSock, ?CDB_RUNNING),
     {ok, ?CONFD_ENUM_VALUE(LevelNum)} = econfd_cdb:get_elem(Cdb, [level | ?LOGPATH]),
-    {ok, Output} = econfd_cdb:get_elem(Cdb, ['log-file-name' | ?LOGPATH]),
+    Filename = case econfd_cdb:get_case(Cdb, [destination | ?LOGPATH], destination) of
+                   {ok, 'log-file-name'} ->
+                       {ok, Output} = econfd_cdb:get_elem(Cdb, ['log-file-name', destination | ?LOGPATH]),
+                       Output;
+                   {ok, 'developer-log'} ->
+                       econfd
+               end,
     Level = case LevelNum of
                 ?genet_error -> error;
                 ?genet_note -> note;
@@ -106,5 +112,5 @@ update_conf(Port) ->
                 ?genet_info -> info;
                 _ -> off  % will cause no logging
             end,
-    gen_server:cast(ec_genet_logger, {update, Level, Output}),
+    gen_server:cast(ec_genet_logger, {update, Level, Filename}),
     econfd_cdb:close(Cdb).

@@ -16,7 +16,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {output=none, filename=none, levels=[], groups=dict:new()}).
+-record(state, {output=none, destination=none, levels=[], groups=dict:new()}).
 -define(ALL_LEVELS, [debug, info, note, warn, error]).  % ordering is important
 
 start_link() ->
@@ -98,25 +98,35 @@ process({{throw_advice, [M, Fn, Line, _Args], {Exc, R}}, Timestamp}, State) ->
 process({{log, Level, Module, Line, Args}, Timestamp}, State) ->
     output_log(State, Timestamp, {'',Level}, '', location(Module, Line), Args),
     State;
-process({update, Level, File}, State) ->
-    process_state_update(Level, binary_to_list(File), State);
+process({update, Level, Destination}, State) ->
+    Dest = case Destination of
+               econfd -> econfd;
+               File when is_binary(File) -> binary_to_list(File)
+           end,
+    process_state_update(Level, Dest, State);
 process(Msg, State) ->
     eclog(error, "Got unexpected request: ~p", [Msg]),
     State.
 
-process_state_update(Level, File, State=#state{filename=File}) ->
+process_state_update(Level, Dest, State=#state{destination=Dest}) ->
     State#state{levels = lists:dropwhile(fun(L) -> L =/= Level end, ?ALL_LEVELS)};
-process_state_update(LN, File, State) ->
+process_state_update(LN, Dest, State) ->
     if is_pid(State#state.output) ->
             file:close(State#state.output);
        true -> ok end,
-    case file:open(File, [append, delayed_write]) of
+    RDev = case Dest of
+              econfd ->
+                  {ok, Dest};
+              File ->
+                  file:open(File, [append, delayed_write])
+          end,
+    case RDev of
         {ok, Dev} ->
             %% perhaps levels changed too
-            process_state_update(LN, File, State#state{output=Dev, filename=File});
+            process_state_update(LN, Dest, State#state{output=Dev, destination=Dest});
         Err ->
-            eclog(error, "Failed to open file ~p for logging: ~p", [File, Err]),
-            #state{filename=File}
+            eclog(error, "Failed to open file ~p for logging: ~p", [Dest, Err]),
+            #state{destination=Dest}
     end.
 
 eclog(error, Format, Args) ->
@@ -159,15 +169,15 @@ lookup_level(Groups, Module, Function) ->
                  {Module::atom(), Function::atom(), Line::integer()},
                  Args::[term(),...]) ->
                         ok.
-output_log(#state{levels=Levels, output=Dev}, Timestamp, {Group,Level}, Event, Location, Args) ->
+output_log(#state{levels=Levels, output=Dest}, Timestamp, {Group,Level}, Event, Location, Args) ->
     case lists:member(Level, Levels) of
         true ->
-            do_output_log(Dev, Timestamp, Group, Level, Event, Location, Args);
+            do_output_log(Dest, Timestamp, Group, Level, Event, Location, Args);
         _ ->
             ok
     end.
 
-do_output_log(Dev, Timestamp, Group, Level, Event, Location, Args) ->
+do_output_log(Dest, Timestamp, Group, Level, Event, Location, Args) ->
     LogList = case Event of
                   exception -> [R,Exc] = Args, throw_log(R, Exc);
                   enter -> [Arg] = Args, enter_log(Arg);
@@ -175,7 +185,7 @@ do_output_log(Dev, Timestamp, Group, Level, Event, Location, Args) ->
                   _ -> [Format, Arg] = Args, io_lib:format(Format, Arg)
               end,
     LogEntry = lists:flatten(LogList),
-    highlight_line(Dev, Group, Level, Event,
+    highlight_line(Dest, Group, Level, Event,
                    io_lib:format("~s [~p;~p] ~s ~s",
                                  [format_timestamp(Timestamp), Level, Group, format_location(Location), LogEntry])).
 
@@ -189,9 +199,16 @@ location(Module, Line) ->
 
 highlight_line(none, _, _, _, _) ->
     ok;
-highlight_line(Dev, dpapi, _, enter, Line) ->
+highlight_line(econfd, _, Level, _, Line) ->
+    ECLevel = case Level of
+                  error -> error;
+                  debug -> trace;
+                  _ -> info
+              end,
+    eclog(ECLevel, "~s", [Line]);
+highlight_line(Dev, dpapi, _, enter, Line) when is_pid(Dev) ->
     io:format(Dev, "~n~s~n~n~s~n", [lists:duplicate(80, $*), Line]);
-highlight_line(Dev, _,_,_,Line) ->
+highlight_line(Dev, _,_,_,Line) when is_pid(Dev) ->
     io:format(Dev, "~s~n", [Line]).
 
 format_timestamp(Timestamp) ->

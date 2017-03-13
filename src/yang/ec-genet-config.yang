@@ -39,11 +39,21 @@ module ec-genet-config {
 
   container ec-genet {
     container logging {
-      leaf log-file-name {
-        description
-          "Destination log file, relative to the ncs running directory.";
-        type string;
-        default "logs/ncs-genet.log";
+      container destination {
+        choice destination {
+          default log-file-name;
+          leaf log-file-name {
+            description
+              "Destination log file, relative to the ncs running directory.";
+            type string;
+            default "logs/ncs-genet.log";
+          }
+          leaf developer-log {
+            description
+              "All logs go to NCS' developer log.";
+            type empty;
+          }
+        }
       }
       leaf level {
         description "Log level threshold.";
