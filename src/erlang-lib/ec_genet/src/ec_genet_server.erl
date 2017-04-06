@@ -538,34 +538,37 @@ process_nested(Op, Tctx, LLPath, NestingArg, Mappings) ->
     case Mappings of
         #mappings{nested=NestedMappings} when NestedMappings /= none, is_list(NestingArg) ->
             ?LOGMSG("Nesting multiple",LLPath, NestingArg),
-            NestingResult =
-                {ok, lists:map(
-                       fun({NestedMapping,NthArg}) ->
-                               case process_mapping(Op, Tctx, LLPath, NthArg, NestedMapping) of
-                                   {ok, Val} -> Val;
-                                   ok -> ok;
-                                   Error={error, _} -> Error
-                               end
-                       end,
-                       lists:zip(NestedMappings,NestingArg))},
+            MapArgPairs = lists:zip(NestedMappings,NestingArg),
+            NestingResult = process_nested_mapping(Op, Tctx, LLPath, MapArgPairs),
             ?LOGMSG("Nesting multiple done",NestingResult),
             NestingResult;
         #mappings{nested=NestedMappings} when NestedMappings /= none ->
             ?LOGMSG("Nesting single",LLPath, NestingArg),
-            NestingResultSingle =
-                {ok, lists:map(
-                       fun(NestedMapping) ->
-                               case process_mapping(Op, Tctx, LLPath, NestingArg, NestedMapping) of
-                                   {ok, Val} -> Val;
-                                   ok -> ok;
-                                   Error={error, _} -> Error
-                               end
-                       end,
-                       NestedMappings)},
+            MapArgPairs = [{Mapping, NestingArg} || Mapping <- NestedMappings],
+            NestingResultSingle = process_nested_mapping(Op, Tctx, LLPath, MapArgPairs),
             ?LOGMSG("Nesting single done",NestingResultSingle),
             NestingResultSingle;
         _ -> % No nested mappings, so let's call the default implementations
             default_ll_op(Op, Tctx, LLPath, NestingArg, Mappings)
+    end.
+
+-spec process_nested_mapping(atom(), #confd_trans_ctx{}, list(), [{#mappings{},_}]) ->
+                                    {ok, list()} | {error, _}.
+process_nested_mapping(Op, Tctx, LLPath, MapArgPairs) ->
+    case lists:mapfoldl(fun({Mapping,Arg}, AccIn) ->
+                                case process_mapping(Op, Tctx, LLPath, Arg, Mapping) of
+                                    {ok, Val} -> {Val, AccIn};
+                                    ok -> {ok, AccIn};
+                                    Error={error, _} -> {Error, Error}
+                                end
+                        end,
+                        ok,
+                        MapArgPairs) of
+        {Results, ok} ->
+            {ok, Results};
+        {Results, Error={error, _}} ->
+            ?LOGMSG("nested mappings completed with an error", Results),
+            Error
     end.
 
 path_rewrite(_Op, Tctx, KeyedLLPath, _Arg, Mappings) ->
