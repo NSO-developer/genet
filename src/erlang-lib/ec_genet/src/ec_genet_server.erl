@@ -699,9 +699,8 @@ default_ll_op(get_elem, Tctx, Path, none, _Mappings) ->
         OkVal={ok, _} ->
             OkVal;
         {error, ErrMsg} ->
-            ErrorMessage = format_error(ErrMsg),
             ?LOGMSG("maapi:get_elem() returned an error; ignored, returning not_found",
-                    Path, ErrorMessage),
+                    Path, ErrMsg),
             not_found
     end;
 default_ll_op(exists, Tctx, Path, none, _Mappings) ->
@@ -711,9 +710,8 @@ default_ll_op(exists, Tctx, Path, none, _Mappings) ->
         OkVal={ok, _} ->
             OkVal;
         {error, ErrMsg} ->
-            ErrorMessage = format_error(ErrMsg),
             ?LOGMSG("maapi:exists() returned an error; ignored, returning not_found",
-                    Path, ErrorMessage),
+                    Path, ErrMsg),
             not_found
     end;
 default_ll_op(create, Tctx, Path, _Val, _Mappings) ->
@@ -748,9 +746,8 @@ default_ll_op(get_case, Tctx, [LLChoice|Path], _HLChoice, _Mappings) ->
         {error, {1, _Msg}} ->
             not_found;
         {error, ErrMsg} ->
-            ErrorMessage = format_error(ErrMsg),
             ?LOGMSG("maapi:get_case() returned an error; ignored, returning not_found",
-                    Path, ErrorMessage),
+                    Path, ErrMsg),
             not_found
     end;
 default_ll_op(set_case, _Tctx, _Path, {_Choice, _Case}, _Mappings) ->
@@ -765,8 +762,12 @@ default_ll_op(nop, _Tctx, _Path, _Arg, _Mappings) ->
 %%% Helper functions
 %%%===================================================================
 
+format_error(Term) when is_binary(Term) ->
+    Term;
+format_error(Term) when is_list(Term) ->
+    list_to_binary(Term);
 format_error(Term) ->
-    lists:flatten(io_lib:format("~p",[Term])).
+    list_to_binary(io_lib:format("~p",[Term])).
 extract_keys(Path) ->
     lists:filter(fun(E) -> is_tuple(E) end, Path).
 
