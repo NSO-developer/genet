@@ -48,9 +48,8 @@ init([]) ->
       callpoint       = ec_genet},
 
     Port = application:get_env(ec_genet, port, ?NCS_PORT),
-    {ok, M} = econfd_maapi:connect({127,0,0,1}, Port),
     {ok, Daemon} = econfd:init_daemon(transform, ?GENET_TRACE_LEVEL, user,
-                                      M, {127,0,0,1}, Port),
+                                      none, {127,0,0,1}, Port),
     ok = econfd:register_trans_cb(Daemon, TransDP),
     ok = econfd:register_data_cb(Daemon, DP),
     ok = econfd:register_done(Daemon),
@@ -190,7 +189,8 @@ get_mapping_fun(RevHLPath, Key = {Prio, RevPrefixPath}) ->
 %%%===================================================================
 
 s_init(Tctx) ->
-    M = (Tctx#confd_trans_ctx.dx)#confd_daemon_ctx.d_opaque,
+    Port = application:get_env(ec_genet, port, ?NCS_PORT),
+    {ok,M} = econfd_maapi:connect({127,0,0,1}, Port),
     econfd_maapi:attach(M, 0, Tctx),
     %% TH = Tctx#confd_trans_ctx.thandle,
     %% LogLevel = get_current_loglevel(M, TH),
@@ -202,7 +202,8 @@ s_finish(Tctx) ->
     M = tctx_maapi_sock(Tctx),
     TH = Tctx#confd_trans_ctx.thandle,
     try
-        ok = econfd_maapi:detach(M, TH)
+        ok = econfd_maapi:detach(M, TH),
+        ok = econfd_maapi:close(M)
     catch
         _:Error ->
             ?LOGERR("Could not detach from transaction", Error)
