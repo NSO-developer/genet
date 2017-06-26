@@ -622,7 +622,8 @@ process_value(Op, Tctx, RawVal, Mappings, HLPath) ->
             %% Check that mapping function returned same number of
             %% values as there are nested mappings
             case {RetVal, Mappings} of
-                {_, #mappings{nested=Nested}} when Nested == none ->
+                {_, #mappings{nested=Nested, fopmap=OpMap}} when Nested == none; OpMap /= none ->
+                    %% any differences may be fixed in fopmap
                     ok;
                 {RetVal, #mappings{nested=Nested}} when not is_list(RetVal), Nested /= none ->
                     ExpectedLength = length(Nested),
