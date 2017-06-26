@@ -373,6 +373,7 @@ from_existence_delete(LLPath, LLPathOrMap, ExistsLLVal) ->
 pre_hook(LLPathOrMap, HookMap) ->
     #mappings{nested=[hook_map(HookMap),
                       compose(#mappings{}, LLPathOrMap)],
+              fdnval=ec_genet:value_fun(fun(Val) -> [Val, Val] end),
               fupval=ec_genet:value_fun(fun([_,Val]) -> Val end)}.
 
 %% @spec post_hook(Path | Map, Map) -> mappings()
@@ -381,6 +382,7 @@ pre_hook(LLPathOrMap, HookMap) ->
 post_hook(LLPathOrMap, HookMap) ->
     #mappings{nested=[compose(#mappings{}, LLPathOrMap),
                       hook_map(HookMap)],
+              fdnval=ec_genet:value_fun(fun(Val) -> [Val, Val] end),
               fupval=ec_genet:value_fun(fun([Val,_]) -> Val end)}.
 
 %% @spec address_switch(Path | Map, Path | Map) -> mappings()
