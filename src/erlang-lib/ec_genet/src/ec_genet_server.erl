@@ -621,7 +621,8 @@ process_value(Op, Tctx, RawVal, Mappings, HLPath) ->
             %% Check that mapping function returned same number of
             %% values as there are nested mappings
             case {RetVal, Mappings} of
-                {_, #mappings{nested=Nested}} when Nested == none ->
+                {_, #mappings{nested=Nested, fopmap=OpMap}} when Nested == none; OpMap /= none ->
+                    %% any differences may be fixed in fopmap
                     ok;
                 {RetVal, #mappings{nested=Nested}} when not is_list(RetVal), Nested /= none ->
                     ExpectedLength = length(Nested),
@@ -949,6 +950,17 @@ convert_enum_value(Atom, Cs) when is_atom(Atom) ->
 
 convert_key_values(Path,Keys) ->
     case econfd_schema:ikeypath2cs(Path) of
+        #confd_cs_node{keys=[],flags=F} when F band ?CONFD_CS_IS_LIST == ?CONFD_CS_IS_LIST ->
+            %% keyless list, only checking/fixing the tag
+            case Keys of
+                {{Tag, Int}} when is_integer(Int), Tag >= ?C_INT8, Tag =< ?C_UINT64 ->
+                    {?CONFD_INT64(Int)};
+                {Int} when is_integer(Int) ->
+                    {?CONFD_INT64(Int)};
+                _ ->
+                    ?LOGWARN("Cannot convert keys for a keyless list", Keys),
+                    Keys
+            end;
         #confd_cs_node{keys=KeyNames} ->
             KeyConv = fun ({KeyName,KeyVal}) ->
                               convert_value([KeyName|Path], KeyVal)
