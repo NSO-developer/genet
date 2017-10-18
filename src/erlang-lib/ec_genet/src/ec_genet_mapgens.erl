@@ -459,6 +459,8 @@ leaf_list_map(LLPathOrMap, Type, Type) ->
     path_to_mappings(LLPathOrMap);
 leaf_list_map(LLPathOrMap, HLType, LLType) ->
     compose(#mappings{
+               fupkeys=fun(_,_,false,_) -> false;
+                          (_,_,{Key},_) -> {to_int(from_int(Key, LLType), HLType)} end, % needed in ncs-4.5
                fupval=ec_genet:value_fun(fun(?CONFD_LIST(List)) ->
                                                  ?CONFD_LIST([to_int(from_int(I, LLType), HLType) ||
                                                                  I <- List])

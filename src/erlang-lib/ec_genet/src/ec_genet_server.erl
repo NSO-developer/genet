@@ -961,6 +961,9 @@ convert_key_values(Path,Keys) ->
                     ?LOGWARN("Cannot convert keys for a keyless list", Keys),
                     Keys
             end;
+        #confd_cs_node{keys=[],flags=F} when F band ?CONFD_CS_IS_LEAF_LIST == ?CONFD_CS_IS_LEAF_LIST ->
+            %% leaf-list - values may need to be converted too, but that is not possible
+            Keys;
         #confd_cs_node{keys=KeyNames} ->
             KeyConv = fun ({KeyName,KeyVal}) ->
                               convert_value([KeyName|Path], KeyVal)
