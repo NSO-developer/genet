@@ -64,4 +64,6 @@ clean:
 ../ebin/%.beam: %.erl
 	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<
 
-$(EBIN_FILES): $(HRL_FILES)
+../ebin/aop.beam: logging_all
+
+$(EBIN_FILES): $(HRL_FILES) ../ebin/aop.beam
