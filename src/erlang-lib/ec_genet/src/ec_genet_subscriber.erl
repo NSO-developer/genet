@@ -98,6 +98,8 @@ update_conf(Port) ->
     {ok, Cdb} = econfd_cdb:new_session(RSock, ?CDB_RUNNING),
     {ok, ?CONFD_ENUM_VALUE(LevelNum)} = econfd_cdb:get_elem(Cdb, [level | ?LOGPATH]),
     Filename = case econfd_cdb:get_case(Cdb, [destination | ?LOGPATH], destination) of
+                   {ok, 'stdout'} ->
+                       standard_io;
                    {ok, 'log-file-name'} ->
                        {ok, Output} = econfd_cdb:get_elem(Cdb, ['log-file-name', destination | ?LOGPATH]),
                        Output;

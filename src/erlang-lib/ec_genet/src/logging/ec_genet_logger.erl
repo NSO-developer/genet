@@ -101,6 +101,7 @@ process({{log, Level, Module, Line, Args}, Timestamp}, State) ->
 process({update, Level, Destination}, State) ->
     Dest = case Destination of
                econfd -> econfd;
+               standard_io -> standard_io;
                File when is_binary(File) -> binary_to_list(File)
            end,
     process_state_update(Level, Dest, State);
@@ -115,10 +116,12 @@ process_state_update(LN, Dest, State) ->
             file:close(State#state.output);
        true -> ok end,
     RDev = case Dest of
-              econfd ->
-                  {ok, Dest};
-              File ->
-                  file:open(File, [append, delayed_write])
+               standard_io ->
+                   {ok, Dest};
+               econfd ->
+                   {ok, Dest};
+               File ->
+                   file:open(File, [append, delayed_write])
           end,
     case RDev of
         {ok, Dev} ->
@@ -206,9 +209,9 @@ highlight_line(econfd, _, Level, _, Line) ->
                   _ -> info
               end,
     eclog(ECLevel, "~s", [Line]);
-highlight_line(Dev, dpapi, _, enter, Line) when is_pid(Dev) ->
+highlight_line(Dev, dpapi, _, enter, Line) ->
     io:format(Dev, "~n~s~n~n~s~n", [lists:duplicate(80, $*), Line]);
-highlight_line(Dev, _,_,_,Line) when is_pid(Dev) ->
+highlight_line(Dev, _,_,_,Line) ->
     io:format(Dev, "~s~n", [Line]).
 
 format_timestamp(Timestamp) ->
