@@ -31,7 +31,7 @@ ERLC_FLAGS += -DCONFD_CS_IS_LEAF_LIST=0
 endif
 
 ifndef NO_AOP_LOGGING
-ERLC_FLAGS += '+{parse_transform,aop}' '+{aop_config_dir, "logging"}'
+ERLC_FLAGS += '+{parse_transform,aop}' '+{aop_config_dir, "logging"}' '+{aop_groups_module, genet_logging}'
 endif
 
 

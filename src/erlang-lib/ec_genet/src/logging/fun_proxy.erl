@@ -129,16 +129,22 @@ call_target_r(Name, Arity, Line) ->
 %%      advice_module:advice_function(P1,P2,..)
 %%
 call_generic_advice(Line, Aspect, Param_list) ->
+    Advice = Aspect#aspect.advice,
     {
       call, Line,
       {
         remote, Line,
-        {atom, Line, (Aspect#aspect.advice)#advice.module},
-        {atom, Line, (Aspect#aspect.advice)#advice.function}
+        {atom, Line, Advice#advice.module},
+        {atom, Line, Advice#advice.function}
       },
-      Param_list  % list of parameters of advice function
-    }
-        .
+      [advice_argument(Line, Arg) || Arg <- Advice#advice.arguments]
+      ++ Param_list  % list of parameters of advice function
+    }.
+
+advice_argument(Line, A) when is_atom(A) ->
+    {atom, Line, A};
+advice_argument(Line, I) when is_integer(I) ->
+    {integer, Line, I}.
 
 %% @spec call_advice(Line, Aspect) -> term()
 %%      Line = integer()

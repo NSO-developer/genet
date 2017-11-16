@@ -8,7 +8,8 @@
 -record(advice, {
           type::before|after_return|after_throw|after_final|around,
           module::atom(),
-          function::atom()
+          function::atom(),
+          arguments::list(atom()|integer())
          }).
 
 -record(aspect, {

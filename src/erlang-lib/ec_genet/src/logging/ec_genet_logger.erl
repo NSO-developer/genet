@@ -7,16 +7,15 @@
 
 -export([start_link/0]).
 
--export([before_advice/1,after_advice/2,throw_advice/2,log/4]).
+-export([before_advice/3,after_advice/4,throw_advice/3,log/4]).
 
 -include_lib("econfd/include/econfd.hrl").
 -include_lib("econfd/include/econfd_errors.hrl").
 -include("ec_genet.hrl").
--include("log_groups.hrl").
 
 -define(SERVER, ?MODULE).
 
--record(state, {output=none, destination=none, levels=[], groups=dict:new()}).
+-record(state, {output=none, destination=none, levels=[]}).
 -define(ALL_LEVELS, [debug, info, note, warn, error]).  % ordering is important
 
 start_link() ->
@@ -25,20 +24,9 @@ start_link() ->
 init(_Args) ->
     process_flag(trap_exit, true),
     %% initial config read in the subscriber
-    ConfState = #state{groups=process_log_groups()},
+    ConfState = #state{},
     eclog(info, "logger started", []),
     {ok, ConfState}.
-
-process_log_groups() ->
-    GroupDeepList = lists:map(fun process_log_group/1, ?LOG_LEVELS),
-    dict:from_list(lists:flatten(GroupDeepList)).
-
-process_log_group({Group, Level}) ->
-    [process_log_group_module(Group, Level, Module, Funs) ||
-        {Module, Funs} <- proplists:get_value(Group, ?LOG_GROUPS, [])].
-
-process_log_group_module(Group, Level, Module, Funs) ->
-    [{{Module, Fun}, {Group, Level}} || Fun <- Funs].
 
 handle_call(getstate, _From, State) ->
     %% debugging only
@@ -66,14 +54,14 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Logging API functions
 %%%%%%%%%
 
-before_advice(Desc) ->
-    request({before_advice, Desc}).
+before_advice(Group, Level, Desc) ->
+    request({before_advice, {Group, Level}, Desc}).
 
-after_advice(Desc, R) ->
-    request({after_advice, Desc, R}).
+after_advice(Group, Level, Desc, R) ->
+    request({after_advice, {Group, Level}, Desc, R}).
 
-throw_advice(Desc, {Exc,R}) ->
-    request({throw_advice, Desc, {Exc, R}}),
+throw_advice(Group, Desc, {Exc,R}) ->
+    request({throw_advice, {Group, exception}, Desc, {Exc, R}}),
     erlang:raise(Exc, R, erlang:get_stacktrace()).
 
 log(Level, Module, Line, Args) ->
@@ -86,14 +74,14 @@ log(Level, Module, Line, Args) ->
 request(Request) ->
     gen_server:cast(?SERVER, {Request, os:timestamp()}).
 
-process({{before_advice, [M, Fn, Line, Args]}, Timestamp}, State) ->
-    format_log_level(State, Timestamp, fix_location(M, Fn, Line), enter, [Args]),
+process({{before_advice, Level, [M, Fn, Line, Args]}, Timestamp}, State) ->
+    output_log(State, Timestamp, Level, enter, fix_location(M, Fn, Line), [Args]),
     State;
-process({{after_advice, [M, Fn, Line, _Args], R}, Timestamp}, State) ->
-    format_log_level(State, Timestamp, fix_location(M, Fn, Line), exit, [R]),
+process({{after_advice, Level, [M, Fn, Line, _Args], R}, Timestamp}, State) ->
+    output_log(State, Timestamp, Level, exit, fix_location(M, Fn, Line), [R]),
     State;
-process({{throw_advice, [M, Fn, Line, _Args], {Exc, R}}, Timestamp}, State) ->
-    format_log_level(State, Timestamp, fix_location(M,Fn,Line), exception, [Exc, R]),
+process({{throw_advice, Level, [M, Fn, Line, _Args], {Exc, R}}, Timestamp}, State) ->
+    output_log(State, Timestamp, Level, exception, fix_location(M,Fn,Line), [Exc, R]),
     State;
 process({{log, Level, Module, Line, Args}, Timestamp}, State) ->
     output_log(State, Timestamp, {'',Level}, '', location(Module, Line), Args),
@@ -142,27 +130,6 @@ eclog(trace, Format, Args) ->
 %%%%%%%%%
 %%% Logging functions
 %%%%%%%%%
-
-format_log_level(State, Timestamp, Location={Module,Function,_Line}, Event, Args) ->
-    Level = lookup_level(State#state.groups, Module, Function, Event),
-    output_log(State, Timestamp, Level, Event, Location, Args).
-
-%% @doc For given function and event type, lookup log level.  For
-%% event type `exception' it is always `warn'.
--spec lookup_level(Groups::term(), Module::atom(), Function::atom(), Event::atom()) ->
-                          {LogGroup::atom(), Level::atom()}.
-lookup_level(Groups, Module, Function, exception) ->
-    {Group,_Level} = lookup_level(Groups, Module, Function),
-    {Group,warn};
-lookup_level(Groups, Module, Function, _Event) ->
-    lookup_level(Groups, Module, Function).
-
-%% TODO: convert this to dict lookup
-lookup_level(Groups, Module, Function) ->
-    case dict:find({Module, Function}, Groups) of
-        {ok, Value} -> Value;
-        error -> {unknown, unknown}
-    end.
 
 %% @doc Format new log entry and write it to the output file.
 -spec output_log(#state{},
