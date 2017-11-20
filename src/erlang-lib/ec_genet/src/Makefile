@@ -4,7 +4,7 @@ include ../vsn.mk
 APP_DIR    = $(shell dirname $(CURDIR))
 APP_NAME   = $(shell basename $(APP_DIR))
 ERL_FILES  = $(wildcard *.erl)
-MODULES    = $(ERL_FILES:%.erl=%)
+MODULES    = $(ERL_FILES:%.erl=%) ec_genet_logger
 EBIN_FILES = $(MODULES:%=../ebin/%.beam) ../ebin/$(APP_NAME).app
 YANG_DIR   = ../../../yang
 YANGS	   = $(filter-out %-ann.yang, $(wildcard $(YANG_DIR)/*.yang))
