@@ -31,8 +31,6 @@
 
 -define(MapgensAux, [process_composed_keys,extract_composed_keys,compose_list]).
 
--define(ACLAux, [get_permit_deny,name2seq]).
-
 %% Log group identifies a set of functions in a module.  Any function that is supposed to
 %% be logged needs to belong to a log group; any function in a group is compiled with a
 %% code to perform logging when the particular log level is turned on.
@@ -42,8 +40,6 @@
          {calls,      [{ec_genet, ?GenetAux}]},
          {auxiliary, [{ec_genet_server, ?ServerAux},
                       {ec_genet_server, ?ServerConvert},
-                      {ec_map_syslog_helper, [severity]},
-                      {ec_map_acl, ?ACLAux},
                       {ec_genet_mapgens, ?MapgensAux}]}]).
 
 %% Mapping from log group name to log level.  A function, so as to be logged, needs to

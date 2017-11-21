@@ -424,14 +424,23 @@ existence_to_list_instance(LLList) ->
 %% When the HL leaf value is retrieved, it looks at the instance key value, when it is
 %% set, mapping renames the instance, if it exists, creates it otherwise.
 leaf_to_list_instance(LLList, KeyName) ->
-    #mappings{get_elem=fun(Tctx,_,_) -> {As} = ec_genet:get_first_keyset(Tctx, LLList), As end,
-              set_elem=fun(Tctx,_,As,_) -> %% If an instance already exists, it should be moved/renamed
-                               CAs = ec_genet_server:convert_value([KeyName|LLList], As),
-                               case ec_genet:get_first_keyset(Tctx, LLList) of
-                                   not_found -> ec_genet:create(Tctx, [{CAs}|LLList]);
-                                   {OldAs}   -> ec_genet:move(Tctx, [{OldAs}|LLList], {CAs})
-                               end
-                       end}.
+    #mappings{path=LLList,
+              get_elem=
+                fun(Tctx,_,_) ->
+                  case ec_genet:get_first_keyset(Tctx, LLList) of
+                    not_found -> not_found;
+                    {As} -> As
+                  end
+                end,
+              set_elem=
+                fun(Tctx,_,As,_) -> %% If an instance already exists, it should be moved/renamed
+                    CAs = ec_genet_server:convert_value([KeyName|LLList], As),
+                    case ec_genet:get_first_keyset(Tctx, LLList) of
+                        not_found -> ec_genet:create(Tctx, [{CAs}|LLList]);
+                        {CAs}     -> ok;
+                        {OldAs}   -> ec_genet:move(Tctx, [{OldAs}|LLList], {CAs})
+                    end
+                end}.
 
 %% @spec node_to_list_instance_subnode(Path | Map, Path) -> mappings()
 %%

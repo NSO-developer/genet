@@ -952,7 +952,7 @@ convert_enum_value(Atom, Cs) when is_atom(Atom) ->
 
 convert_key_values(Path,Keys) ->
     case econfd_schema:ikeypath2cs(Path) of
-        #confd_cs_node{keys=[],flags=F} when F band ?CONFD_CS_IS_LIST == ?CONFD_CS_IS_LIST ->
+        #confd_cs_node{keys=[],flags=F} when F band ?CONFD_CS_IS_LIST =/= 0 ->
             %% keyless list, only checking/fixing the tag
             case Keys of
                 {{Tag, Int}} when is_integer(Int), Tag >= ?C_INT8, Tag =< ?C_UINT64 ->
@@ -963,7 +963,7 @@ convert_key_values(Path,Keys) ->
                     ?LOGWARN("Cannot convert keys for a keyless list", Keys),
                     Keys
             end;
-        #confd_cs_node{keys=[],flags=F} when F band ?CONFD_CS_IS_LEAF_LIST == ?CONFD_CS_IS_LEAF_LIST ->
+        #confd_cs_node{keys=[],flags=F} when F band ?CONFD_CS_IS_LEAF_LIST =/= 0 ->
             %% leaf-list - values may need to be converted too, but that is not possible
             Keys;
         #confd_cs_node{keys=KeyNames} ->

@@ -4,13 +4,18 @@ include ../vsn.mk
 APP_DIR    = $(shell dirname $(CURDIR))
 APP_NAME   = $(shell basename $(APP_DIR))
 ERL_FILES  = $(wildcard *.erl)
-MODULES    = $(ERL_FILES:%.erl=%)
+MODULES    = $(ERL_FILES:%.erl=%) ec_genet_logger
 EBIN_FILES = $(MODULES:%=../ebin/%.beam) ../ebin/$(APP_NAME).app
 YANG_DIR   = ../../../yang
 YANGS	   = $(filter-out %-ann.yang, $(wildcard $(YANG_DIR)/*.yang))
 NS_DIR	   = ../ns
 NS_FILES   = $(YANGS:$(YANG_DIR)/%.yang=$(NS_DIR)/%.hrl)
 HRL_FILES  = $(wildcard *.hrl) $(wildcard ../include/*.hrl) $(NS_FILES)
+
+NCS_VERSION ?= 4.5
+NCS_VERSION_CHECK = $(shell head -n1 $(NCS_DIR)/VERSION \
+	| cut -d . -f-2 \
+	| awk '{if ($$2 < $(NCS_VERSION)) {print "old"} else {print "new"}}')
 
 ERLC       = erlc
 ERLC_FLAGS := \
@@ -20,6 +25,10 @@ ERLC_FLAGS := \
 	+warnings_as_errors \
 	-pa $(NCS_DIR)/erlang/econfd/ebin \
 	-pa ../../ec_genet/ebin
+
+ifeq ($(NCS_VERSION_CHECK), old)
+ERLC_FLAGS += -DCONFD_CS_IS_LEAF_LIST=0
+endif
 
 ifndef NO_AOP_LOGGING
 ERLC_FLAGS += '+{parse_transform,aop}' '+{aop_config_dir, "logging"}'
@@ -55,4 +64,6 @@ clean:
 ../ebin/%.beam: %.erl
 	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<
 
-$(EBIN_FILES): $(HRL_FILES)
+../ebin/aop.beam: logging_all
+
+$(EBIN_FILES): $(HRL_FILES) ../ebin/aop.beam

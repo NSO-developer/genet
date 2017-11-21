@@ -840,11 +840,11 @@ prefix_to_addrmask(?CONFD_IPV6PREFIX({Addr, Len})) ->
 
 addrmask_to_prefix(?CONFD_IPV4(Addr), ?CONFD_IPV4(Mask)) when size(Addr) == 4 ->
     ?CONFD_IPV4PREFIX({Addr, ip_masklen(tuple_to_list(Mask))});
-addrmask_to_prefix(?CONFD_IPV6(Addr), ?CONFD_IPV6(Mask)) when size(Addr) == 16 ->
+addrmask_to_prefix(?CONFD_IPV6(Addr), ?CONFD_IPV6(Mask)) when size(Addr) == 8 ->
     ?CONFD_IPV6PREFIX({Addr, ip_masklen(tuple_to_list(Mask))}).
 
 ipv4_netmask(Len) ->
-    to_mask(16#ffffffff - (16#ffffffff bsr Len), 4, []).
+    [X || <<X:8>> <= <<(16#ffffffff - (16#ffffffff bsr Len)):32>>].
 
 % ipv4 address masks in ACEs are inverted from normal address masks
 % invert the mask stored in IOS to compute the correct prefix length for oc-acl
@@ -868,21 +868,17 @@ ipv4_invnetmask(Len) ->
     [255-A,255-B,255-C,255-D].
 
 ipv6_netmask(Len) ->
-    to_mask(16#ffffffffffffffffffffffffffffffff - (16#ffffffffffffffffffffffffffffffff bsr Len), 16, []).
+    [X || <<X:16>> <=
+              <<(16#ffffffffffffffffffffffffffffffff - (16#ffffffffffffffffffffffffffffffff bsr Len)):128>>].
 
-to_mask(_, 0, L) ->
-    L;
-to_mask(Num, I, L) ->
-    to_mask(Num bsr 8, I-1, [Num band 16#ff | L]).
+ip_masklen(Mask) when length(Mask) == 4 ->
+    ip_masklen(Mask, 8);
+ip_masklen(Mask) when length(Mask) == 8 ->
+    ip_masklen(Mask, 16).
 
-ip_masklen([255|L]) ->
-    8+ip_masklen(L);
-ip_masklen([]) ->
-    0;
-ip_masklen([N|_]) -> mask_bitsize(N).
-
-mask_bitsize(0) -> 0;
-mask_bitsize(N) -> 1+mask_bitsize((N bsl 1) band 16#ff).
+ip_masklen(Mask, WordSize) ->
+    Bits = << << Word:WordSize >> || Word <- Mask >>,
+    length([X || <<X:1>> <= Bits, X /= 0]).
 
 %%%===================================================================
 %%% End
