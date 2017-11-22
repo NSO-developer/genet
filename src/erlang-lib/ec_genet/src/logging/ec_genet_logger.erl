@@ -61,7 +61,7 @@ after_advice(Group, Level, Desc, R) ->
     request({after_advice, {Group, Level}, Desc, R}).
 
 throw_advice(Group, Desc, {Exc,R}) ->
-    request({throw_advice, {Group, exception}, Desc, {Exc, R}}),
+    request({throw_advice, {Group, warn}, Desc, {Exc, R}}),
     erlang:raise(Exc, R, erlang:get_stacktrace()).
 
 log(Level, Module, Line, Args) ->
