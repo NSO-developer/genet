@@ -29,7 +29,7 @@
         [val2str,str2val,int2decimal64,decimal642int,dup,get_first_keyset,
          value_fun,int_value_fun,run_initiate_dynamic_next]).
 
--define(MapgensAux, [process_composed_keys,extract_composed_keys,compose_list]).
+-define(MapgensAux, [composite_list, composite_list_opmap, composite_list_upkeys]).
 
 -define(ACLAux, [get_permit_deny,name2seq]).
 
