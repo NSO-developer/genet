@@ -131,7 +131,7 @@ get_configurations([Dir | Dirs], Result) ->
         get_configurations(Dirs, lists:append(read_adf(ADF_files), Result))
 .
 
-%% @spec read_adf(Files::list()) -> list(#aspect{})
+%% @spec read_adf(Groups::list(), Files::list()) -> list(#aspect{})
 %% @doc reads adf file and converts its content to Erlang term.
 %%
 read_adf(Files) ->
