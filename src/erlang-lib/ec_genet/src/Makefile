@@ -39,6 +39,15 @@ APPSCRIPT = '$$vsn=shift; $$mods=""; while(@ARGV){ $$_=shift; s/^([A-Z].*)$$/\'\
 
 all: $(NCS_DIR)/erlang/econfd/ebin logging_all $(EBIN_FILES)
 
+EDOC_FLAG = ../edoc/.done
+docs: $(EDOC_FLAG)
+
+$(EDOC_FLAG): $(ERL_FILES) $(wildcard ../include/*.hrl) overview.edoc
+	@mkdir -p $(dir $(EDOC_FLAG))
+	erl -noshell -s edoc_run application genet '"."' \
+		'[{dir,"$(dir $(EDOC_FLAG))"},{todo,true},no_subpackages,{overview, "overview.edoc"},{includes,["../include"]}]'
+	@touch $(EDOC_FLAG)
+
 .PHONY: logging_all
 logging_all:
 	$(MAKE) -C logging all

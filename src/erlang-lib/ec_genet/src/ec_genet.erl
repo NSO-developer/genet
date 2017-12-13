@@ -414,6 +414,9 @@ get_next(Cursor) ->
         _                        -> not_found
     end.
 
+%% @doc Handle `get_next' for multiple lists.
+%%
+%% @deprecated Use {@link ec_genet_mapgens:composite_list/2} instead.
 composite_list_get_next(Tctx,HLPath,-1,Extra) ->
     {composite_list_get_next, ListOfYangLists} = lists:keyfind(composite_list_get_next, 1, Extra),
     State = composite_list_initial_state(Tctx, ListOfYangLists, Extra),

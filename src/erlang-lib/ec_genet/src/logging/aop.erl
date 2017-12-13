@@ -66,7 +66,7 @@ read_groups_config(Module, Dir) when Module /= undefined, is_list(Dir) ->
 read_groups_config(_, _) ->
         none.
 
-%% @spec read_adf(Files::list()) -> list(#aspect{})
+%% @spec read_adf(Groups::list(), Files::list()) -> list(#aspect{})
 %% @doc reads adf file and converts its content to Erlang term.
 %%
 read_adf(Groups, Files) ->
