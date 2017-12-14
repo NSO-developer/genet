@@ -71,6 +71,7 @@ clean:
 	perl -e $(APPSCRIPT) "$(VSN)" $(MODULES) < $< > $@
 
 ../ebin/%.beam: %.erl
+	@mkdir -p ../ebin
 	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<
 
 ../ebin/aop.beam: logging_all
