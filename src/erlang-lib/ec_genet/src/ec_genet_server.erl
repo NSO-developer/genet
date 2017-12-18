@@ -48,9 +48,8 @@ init([]) ->
       callpoint       = ec_genet},
 
     Port = application:get_env(ec_genet, port, ?NCS_PORT),
-    {ok, M} = econfd_maapi:connect({127,0,0,1}, Port),
     {ok, Daemon} = econfd:init_daemon(transform, ?GENET_TRACE_LEVEL, user,
-                                      M, {127,0,0,1}, Port),
+                                      none, {127,0,0,1}, Port),
     ok = econfd:register_trans_cb(Daemon, TransDP),
     ok = econfd:register_data_cb(Daemon, DP),
     ok = econfd:register_done(Daemon),
@@ -190,7 +189,8 @@ get_mapping_fun(RevHLPath, Key = {Prio, RevPrefixPath}) ->
 %%%===================================================================
 
 s_init(Tctx) ->
-    M = (Tctx#confd_trans_ctx.dx)#confd_daemon_ctx.d_opaque,
+    Port = application:get_env(ec_genet, port, ?NCS_PORT),
+    {ok,M} = econfd_maapi:connect({127,0,0,1}, Port),
     econfd_maapi:attach(M, 0, Tctx),
     %% TH = Tctx#confd_trans_ctx.thandle,
     %% LogLevel = get_current_loglevel(M, TH),
@@ -202,7 +202,8 @@ s_finish(Tctx) ->
     M = tctx_maapi_sock(Tctx),
     TH = Tctx#confd_trans_ctx.thandle,
     try
-        ok = econfd_maapi:detach(M, TH)
+        ok = econfd_maapi:detach(M, TH),
+        ok = econfd_maapi:close(M)
     catch
         _:Error ->
             ?LOGERR("Could not detach from transaction", Error)
@@ -700,9 +701,8 @@ default_ll_op(get_elem, Tctx, Path, none, _Mappings) ->
         OkVal={ok, _} ->
             OkVal;
         {error, ErrMsg} ->
-            ErrorMessage = format_error(ErrMsg),
             ?LOGMSG("maapi:get_elem() returned an error; ignored, returning not_found",
-                    Path, ErrorMessage),
+                    Path, ErrMsg),
             not_found
     end;
 default_ll_op(exists, Tctx, Path, none, _Mappings) ->
@@ -712,9 +712,8 @@ default_ll_op(exists, Tctx, Path, none, _Mappings) ->
         OkVal={ok, _} ->
             OkVal;
         {error, ErrMsg} ->
-            ErrorMessage = format_error(ErrMsg),
             ?LOGMSG("maapi:exists() returned an error; ignored, returning not_found",
-                    Path, ErrorMessage),
+                    Path, ErrMsg),
             not_found
     end;
 default_ll_op(create, Tctx, Path, _Val, _Mappings) ->
@@ -749,9 +748,8 @@ default_ll_op(get_case, Tctx, [LLChoice|Path], _HLChoice, _Mappings) ->
         {error, {1, _Msg}} ->
             not_found;
         {error, ErrMsg} ->
-            ErrorMessage = format_error(ErrMsg),
             ?LOGMSG("maapi:get_case() returned an error; ignored, returning not_found",
-                    Path, ErrorMessage),
+                    Path, ErrMsg),
             not_found
     end;
 default_ll_op(set_case, _Tctx, _Path, {_Choice, _Case}, _Mappings) ->
@@ -766,8 +764,12 @@ default_ll_op(nop, _Tctx, _Path, _Arg, _Mappings) ->
 %%% Helper functions
 %%%===================================================================
 
+format_error(Term) when is_binary(Term) ->
+    Term;
+format_error(Term) when is_list(Term) ->
+    list_to_binary(Term);
 format_error(Term) ->
-    lists:flatten(io_lib:format("~p",[Term])).
+    list_to_binary(io_lib:format("~p",[Term])).
 extract_keys(Path) ->
     lists:filter(fun(E) -> is_tuple(E) end, Path).
 
@@ -950,7 +952,7 @@ convert_enum_value(Atom, Cs) when is_atom(Atom) ->
 
 convert_key_values(Path,Keys) ->
     case econfd_schema:ikeypath2cs(Path) of
-        #confd_cs_node{keys=[],flags=F} when F band ?CONFD_CS_IS_LIST == ?CONFD_CS_IS_LIST ->
+        #confd_cs_node{keys=[],flags=F} when F band ?CONFD_CS_IS_LIST =/= 0 ->
             %% keyless list, only checking/fixing the tag
             case Keys of
                 {{Tag, Int}} when is_integer(Int), Tag >= ?C_INT8, Tag =< ?C_UINT64 ->
@@ -961,6 +963,9 @@ convert_key_values(Path,Keys) ->
                     ?LOGWARN("Cannot convert keys for a keyless list", Keys),
                     Keys
             end;
+        #confd_cs_node{keys=[],flags=F} when F band ?CONFD_CS_IS_LEAF_LIST =/= 0 ->
+            %% leaf-list - values may need to be converted too, but that is not possible
+            Keys;
         #confd_cs_node{keys=KeyNames} ->
             KeyConv = fun ({KeyName,KeyVal}) ->
                               convert_value([KeyName|Path], KeyVal)

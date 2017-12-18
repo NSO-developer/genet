@@ -2,4 +2,4 @@
 
 %% defs.adf
 
-advice_utils:log_aspects(Aspect,Advice,Pointcut).
+advice_utils:log_aspects(Groups,Aspect,Advice,Pointcut).

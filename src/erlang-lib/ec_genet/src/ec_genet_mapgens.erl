@@ -16,7 +16,7 @@
          pre_hook/2,post_hook/2,address_switch/2,leaf_list_map/3,
          guard_by_value/3,merge_mappings/2,compose/2,
          existence_to_list_instance/1,leaf_to_list_instance/2,node_to_list_instance_subnode/2,
-         leaf_list_to_leaf/1,compose_lists/1,mappings_switch/3]).
+         leaf_list_to_leaf/1,composite_list/1,mappings_switch/3,composite_list/2]).
 
 -include_lib("econfd/include/econfd.hrl").
 -include_lib("econfd/include/econfd_errors.hrl").
@@ -424,14 +424,23 @@ existence_to_list_instance(LLList) ->
 %% When the HL leaf value is retrieved, it looks at the instance key value, when it is
 %% set, mapping renames the instance, if it exists, creates it otherwise.
 leaf_to_list_instance(LLList, KeyName) ->
-    #mappings{get_elem=fun(Tctx,_,_) -> {As} = ec_genet:get_first_keyset(Tctx, LLList), As end,
-              set_elem=fun(Tctx,_,As,_) -> %% If an instance already exists, it should be moved/renamed
-                               CAs = ec_genet_server:convert_value([KeyName|LLList], As),
-                               case ec_genet:get_first_keyset(Tctx, LLList) of
-                                   not_found -> ec_genet:create(Tctx, [{CAs}|LLList]);
-                                   {OldAs}   -> ec_genet:move(Tctx, [{OldAs}|LLList], {CAs})
-                               end
-                       end}.
+    #mappings{path=LLList,
+              get_elem=
+                fun(Tctx,_,_) ->
+                  case ec_genet:get_first_keyset(Tctx, LLList) of
+                    not_found -> not_found;
+                    {As} -> As
+                  end
+                end,
+              set_elem=
+                fun(Tctx,_,As,_) -> %% If an instance already exists, it should be moved/renamed
+                    CAs = ec_genet_server:convert_value([KeyName|LLList], As),
+                    case ec_genet:get_first_keyset(Tctx, LLList) of
+                        not_found -> ec_genet:create(Tctx, [{CAs}|LLList]);
+                        {CAs}     -> ok;
+                        {OldAs}   -> ec_genet:move(Tctx, [{OldAs}|LLList], {CAs})
+                    end
+                end}.
 
 %% @spec node_to_list_instance_subnode(Path | Map, Path) -> mappings()
 %%
@@ -459,6 +468,8 @@ leaf_list_map(LLPathOrMap, Type, Type) ->
     path_to_mappings(LLPathOrMap);
 leaf_list_map(LLPathOrMap, HLType, LLType) ->
     compose(#mappings{
+               fupkeys=fun(_,_,false,_) -> false;
+                          (_,_,{Key},_) -> {to_int(from_int(Key, LLType), HLType)} end, % needed in ncs-4.5
                fupval=ec_genet:value_fun(fun(?CONFD_LIST(List)) ->
                                                  ?CONFD_LIST([to_int(from_int(I, LLType), HLType) ||
                                                                  I <- List])
@@ -544,50 +555,6 @@ leaf_list_to_leaf(LLPathOrMap) ->
             },
     compose(Map, LLPathOrMap).
 
-%% @spec compose_lists([mappings()]) -> mappings()
-%%
-%% @doc Generate a mappings handling a list that returns keys corresponding to composition
-%% of the mappings provided as argument.
-compose_lists(Mappings) ->
-    #mappings{
-       nested=Mappings,
-       fopmap=fun(Tctx,get_next,Path,-1,_) ->
-                      {Tctx,get_next,Path,-1,#mappings{nested=tag_mappings(Mappings)}};
-                 (Tctx,get_next,Path,{C,M,Active},_) ->
-                      {Tctx,get_next,Path,[[C]],#mappings{nested=[compose_list(M,Active)]}}
-              end,
-       fupkeys=fun(_,_,Keys,_) -> extract_composed_keys(Keys) end}.
-
-process_composed_keys({false,undefined},_,[]) ->
-    {false,undefined};
-process_composed_keys({false,undefined},_,[{K,C,M}|Active]) ->
-    {K,{active,C,M,Active}};
-process_composed_keys({K,C},M,Active) ->
-    {K,{active,C,M,Active}}.
-
-tag_mappings(Mappings) ->
-    [#mappings{nested=[M], fupkeys=fun(_,_,[{K,C}],_) -> {K,{new,C,M}} end} ||
-        M <- Mappings].
-
-extract_composed_keys([{false,undefined}]) ->
-    {false,undefined};
-extract_composed_keys([{K,{active,C,M,Active}}]) ->
-    {K,{C,M,Active}};
-extract_composed_keys(Keys) ->
-    %% first time the composed list was used, return keys are tagged results
-    case [{K,C,M} || {K,{new,C,M}} <- Keys,
-                     {K,C} /= {false,undefined}] of
-        [{K,C,M}|Active] ->
-            {K,{C,M,Active}};
-        [] ->
-            {false,undefined}
-    end.
-
-compose_list(M, Active) ->
-    %% we have double nesting here; this is to be sure that fupkeys calls are honored
-    #mappings{fupkeys=fun(_,_,[K],_) -> process_composed_keys(K, M, Active) end,
-              nested=[M]}.
-
 %% @doc Switching between two variant mappings.  Similar to
 %% `address_switch', but in this case the selection of which path or
 %% mapping should be used is a "switching function", which is invoked
@@ -610,3 +577,77 @@ mappings_switch(PathOrMap1, PathOrMap2, SwitchFun) ->
        fupkeys=ec_genet:value_fun(fun([X]) -> X end),
        nested=[Map1, Map2]
       }.
+
+%% @doc Compose two or more list mappings to one.  Equivalent to
+%% `composite_list(PathOrMaps, [])'.
+-spec composite_list(list(path_or_map())) -> #mappings{}.
+composite_list(PathOrMaps) ->
+    composite_list(PathOrMaps, []).
+
+%% @doc Compose two or more list mappings to one.  The parameter
+%% PathOrMaps is a list of simple paths or mappings instances, Options
+%% is a list of options; currently only `mode' with values `union' or
+%% `each' is supported, defaults to `union'.
+%%
+%% The lists are all used for `get_next' queries, the keys returned
+%% are sorted and returned one by one.  If two of the mappings return
+%% the same key and the `mode' option is `union', the key is used only
+%% once.
+-spec composite_list(list(path_or_map()), list({atom(),any()})) -> #mappings{}.
+composite_list(PathOrMaps, Options) ->
+    #mappings{
+       fopmap=fun(Tctx, get_next, _Path, Arg, _Map) ->
+                      {Args, Map} = composite_list_opmap(PathOrMaps, Options, Arg),
+                      {Tctx, get_next, [], Args, Map}
+              end,
+       fupkeys=fun(_,_,[RetVal],_) -> RetVal end}.
+
+composite_list_opmap(PathOrMaps, _Options, -1) ->
+    Maps = [path_to_mappings(PM) || PM <- PathOrMaps],
+    {-1, composite_list_build_mappings(Maps, {Maps, []})};
+composite_list_opmap(_PMs, Options, State) ->
+    {Args, Maps, Rest} =
+        case proplists:get_value(mode, Options, union) of
+            union ->
+                composite_list_advance_union(State);
+            each ->
+                composite_list_advance_one(State)
+        end,
+    {[Args], composite_list_build_mappings(Maps, {Maps,Rest})}.
+
+%% @doc Mark all mappings that produced the last-used key as mappings
+%% that need to be "advanced", i.e. should be passed to `get_next'
+%% processing.
+composite_list_advance_union([{Key,Cursor,Map},NS={Key,_,_}|Rest]) ->
+    {Args, Maps, RestMaps} = composite_list_advance_union([NS|Rest]),
+    {[Cursor|Args], [Map|Maps], RestMaps};
+composite_list_advance_union(State) ->
+    composite_list_advance_one(State).
+
+composite_list_advance_one([{_,Cursor,Map} | Rest]) ->
+    {[Cursor], [Map], Rest};
+composite_list_advance_one([]) ->
+    {[], [], []}.
+
+%% @doc Build nested-in-nested mappings.  The two levels are necessary
+%% because `extra' is generated dynamically and would be ignored in
+%% the top-level mappings.
+composite_list_build_mappings(Maps, Extra) ->
+    #mappings{nested=[#mappings{nested=Maps, extra=Extra, fupkeys=fun composite_list_upkeys/4}]}.
+
+%% @doc Process values returned by the composed mappings.  Pair
+%% returned {keyset,cursor} pairs with all mappings that were advanced
+%% filtering out all terminated mappings, concatenate it with the
+%% remaining mappings and sort.
+composite_list_upkeys(_Tctx, _Op, RetKeys, {Advanced, Rest}) ->
+    ZipReturn = [{Key, Cursor, Map} ||
+                    {{Key, Cursor}, Map} <- lists:zip(RetKeys, Advanced),
+                    {Key, Cursor} /= {false, undefined}],
+    Sorted = lists:sort(fun({Key1,_,_}, {Key2,_,_}) -> Key1 < Key2 end,
+                        ZipReturn ++ Rest),
+    case Sorted of
+        [] ->
+            {false, undefined};
+        [{Key,_,_}|_] ->
+            {Key, Sorted}
+    end.

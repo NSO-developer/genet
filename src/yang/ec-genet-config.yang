@@ -42,6 +42,12 @@ module ec-genet-config {
       container destination {
         choice destination {
           default log-file-name;
+          leaf stdout {
+            description
+              "Log to standard output (deprecated).";
+            status deprecated;
+            type empty;
+          }
           leaf log-file-name {
             description
               "Destination log file, relative to the ncs running directory.";

@@ -31,6 +31,7 @@
 %%
 %% Include files
 %%
+-include("aop.hrl").
 
 %%
 %% Import modules
@@ -43,102 +44,37 @@
 %%
 %% Exported Functions
 %%
--export([compile/2, compile/3, compile_one_file/3, parse_transform/2]).
+-export([parse_transform/2]).
 
 %%
 %% API Functions
 %%
 
-%% @spec compile(Src_dirs::list(), Config_dirs::list()) -> ok
-%% @doc
-%%      Src_dirs = list(string()) - list of directory names these contain source files,
-%%      Config_dirs = list(string()) - list of directory names these contain configuration files.
-%% The function compiles a set of source files (*.erl) from source directories and applyes
-%% AOP weaving during compilation stage. Configuration files for AOP weaving are taken
-%% from configuration directories (*.adf)
-%%
-compile(Src_dirs, Config_dirs) ->
-        compile(Src_dirs, Config_dirs, [])
-.
-
-%% @spec compile(Src_dirs::list(), Config_dirs::list(), Options::list()) -> ok
-%% @doc
-%%      Src_dirs = list(string()) - list of directory names these contain source files,
-%%      Config_dirs = list(string()) - list of directory names these contain configuration files,
-%%      Options = list() - Options determine the behavior of the compiler as defined in compile:file/2.
-%% The function compiles a set of source files (*.erl) from source directories and applyes
-%% AOP weaving during compilation stage. Configuration files for AOP weaving are taken
-%% from configuration directories (*.adf)
-%%
-compile([], _, _) -> ok;
-compile(Src_dirs, Config_dirs, Options) ->
-        File_list = get_source_files(Src_dirs, []),
-        io:format("Sources = ~p ~n", [File_list]),
-        Opts = get_config_options(Config_dirs, Options),
-        compile_files(File_list, Opts)
-.
-
-get_config_options(Config_dirs, Options) ->
-        Config = get_configurations(Config_dirs, []),
-        lists:append([{parse_transform, weaver}, return, report, {aop_config, Config}],
-                     Options).
-
-%% @spec compile_files(FileList::list(), Options::list()) -> ok
-%% @doc compile list of files with Options.
-%%
-compile_files([], _) -> ok;
-compile_files([File | FileList], Options) ->
-        compile_one_file(File, Options),
-        compile_files(FileList, Options)
-.
-
 parse_transform(Forms, Options) ->
-        ConfigDirs =
-                case proplists:get_value(aop_config_dir, Options) of
-                        undefined -> [];
-                        true -> [];
-                        Dir -> [Dir]
-                end,
-        weaver:parse_transform(Forms, get_config_options(ConfigDirs, Options)).
+        case read_groups_config(proplists:get_value(aop_groups_module, Options),
+                                proplists:get_value(aop_config_dir, Options)) of
+                none ->
+                        Forms;
+                Aspects ->
+                        weaver:parse_transform(Forms, [{aop_config, Aspects}])
+        end.
 
-compile_one_file(File, Config_dirs, Options) ->
-        compile:file(File, get_config_options(Config_dirs, Options)).
+read_groups_config(Module, Dir) when Module /= undefined, is_list(Dir) ->
+        Groups = apply(Module, log_groups, []),
+        ADFFiles = filelib:fold_files(Dir, ".*\.adf$", true, fun(F, Acc) -> [F | Acc] end, []),
+        read_adf(Groups, ADFFiles);
+read_groups_config(_, _) ->
+        none.
 
-compile_one_file(File, Options) ->
-        case compile:file(File, Options) of
-                {ok, ModuleName} -> io:format("Module name = ~p is weaved.~n", [ModuleName]);
-                {ok, ModuleName, Warnings} -> io:format("Module name = ~p is weaved.\t Warnings = ~p~n",
-                                                        [ModuleName, Warnings]);
-                error -> io:format("error~n", []);
-                {error, Errors, Warnings} -> io:format("Errors = ~p Warnings = ~p~n", [Errors, Warnings])
-        end
-.
-
-get_source_files([], Result) -> Result;
-get_source_files([Dir | Dirs], Result) ->
-%       io:format(">>> get_source_files ~p~n", [Dir]),
-        File_names = filelib:fold_files(Dir, ".*\.erl$", true, fun(F, Acc) -> [F | Acc] end, []),
-        get_source_files(Dirs, lists:append(File_names, Result))
-.
-
-%% @spec get_configurations(Dirs::list(), Result::list()) -> list(#aspect{})
-%% @doc Gets configuration files from list of directories and merges it to one
-%% config list.
-get_configurations([], Result) -> Result;
-get_configurations([Dir | Dirs], Result) ->
-        ADF_files = filelib:fold_files(Dir, ".*\.adf$", true, fun(F, Acc) -> [F | Acc] end, []),
-        % io:format("Config files  = ~p~n", [ADF_files]),
-        get_configurations(Dirs, lists:append(read_adf(ADF_files), Result))
-.
-
-%% @spec read_adf(Files::list()) -> list(#aspect{})
+%% @spec read_adf(Groups::list(), Files::list()) -> list(#aspect{})
 %% @doc reads adf file and converts its content to Erlang term.
 %%
-read_adf(Files) ->
-        As = {'Aspect', fun(Ad, Pcs) -> {aspect, Ad, Pcs} end},
-        Pc = {'Pointcut', fun(M,F,A,S) -> {pointcut, M, F, A, S} end},
-        Ad = {'Advice', fun(T, M, F) -> {advice, T, M, F} end},
-        Bindings = [Ad,As,Pc],
+read_adf(Groups, Files) ->
+        Gr = {'Groups', Groups},
+        As = {'Aspect', fun(Ad, Pcs) -> #aspect{advice=Ad, pointcuts=Pcs} end},
+        Pc = {'Pointcut', fun(M,F,A,S) -> #pointcut{module=M, function=F, arity=A, type=S} end},
+        Ad = {'Advice', fun(T, M, F, A) -> #advice{type=T, module=M, function=F, arguments=A} end},
+        Bindings = [Gr,Ad,As,Pc],
         read_adf(Files, Bindings, [])
 .
 

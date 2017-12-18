@@ -22,6 +22,7 @@ clean:
 	rm -f $(EBIN_FILES) erl_crash.dump core* *~
 
 ../../ebin/%.beam: %.erl
+	@mkdir -p ../../ebin
 	$(ERLC) $(ERLC_FLAGS) -o ../../ebin $<
 
 $(EBIN_FILES): $(HRL_FILES)

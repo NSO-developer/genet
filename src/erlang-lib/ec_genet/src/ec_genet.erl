@@ -31,6 +31,7 @@
          get_first_keyset/2,
          cast_to_atom/1,
          prefix_to_addrmask/1,addrmask_to_prefix/2,
+         prefix_to_invaddrmask/1,invaddrmask_to_prefix/2,
          join_pick/2,join_prio/2,join_pick_not_equals/2,
          dup/2,
          str2val/2,val2str/2,
@@ -413,6 +414,9 @@ get_next(Cursor) ->
         _                        -> not_found
     end.
 
+%% @doc Handle `get_next' for multiple lists.
+%%
+%% @deprecated Use {@link ec_genet_mapgens:composite_list/2} instead.
 composite_list_get_next(Tctx,HLPath,-1,Extra) ->
     {composite_list_get_next, ListOfYangLists} = lists:keyfind(composite_list_get_next, 1, Extra),
     State = composite_list_initial_state(Tctx, ListOfYangLists, Extra),
@@ -839,32 +843,45 @@ prefix_to_addrmask(?CONFD_IPV6PREFIX({Addr, Len})) ->
 
 addrmask_to_prefix(?CONFD_IPV4(Addr), ?CONFD_IPV4(Mask)) when size(Addr) == 4 ->
     ?CONFD_IPV4PREFIX({Addr, ip_masklen(tuple_to_list(Mask))});
-addrmask_to_prefix(?CONFD_IPV6(Addr), ?CONFD_IPV6(Mask)) when size(Addr) == 16 ->
+addrmask_to_prefix(?CONFD_IPV6(Addr), ?CONFD_IPV6(Mask)) when size(Addr) == 8 ->
     ?CONFD_IPV6PREFIX({Addr, ip_masklen(tuple_to_list(Mask))}).
 
 ipv4_netmask(Len) ->
-    to_mask(16#ffffffff - (16#ffffffff bsr Len), 4, []).
+    [X || <<X:8>> <= <<(16#ffffffff - (16#ffffffff bsr Len)):32>>].
+
+% ipv4 address masks in ACEs are inverted from normal address masks
+% invert the mask stored in IOS to compute the correct prefix length for oc-acl
+% invert the netmask required for ipv4 ACEs 0.0.0.255 to 255.255.255.0
+
+prefix_to_invaddrmask(?CONFD_IPV4PREFIX({Addr, Len})) ->
+    {?CONFD_IPV4(Addr), ?CONFD_IPV4(list_to_tuple(ipv4_invnetmask(Len)))}.
+
+% ipv4 address masks in ACEs are inverted from normal address masks
+% invert the mask stored in IOS to compute the correct prefix length for oc-acl
+% invert the netmask required for ipv4 ACEs 0.0.0.255 to 255.255.255.0
+invaddrmask_to_prefix(?CONFD_IPV4(Addr), ?CONFD_IPV4(Mask)) when size(Addr) == 4 ->
+    ?CONFD_IPV4PREFIX({Addr, ip_masklen(ipv4_invmask(tuple_to_list(Mask)))}).
+
+ipv4_invmask(Mask) ->
+    [A,B,C,D] = Mask,
+    [255-A,255-B,255-C,255-D].
 
 ipv4_invnetmask(Len) ->
     [A,B,C,D] = ipv4_netmask(Len),
     [255-A,255-B,255-C,255-D].
 
 ipv6_netmask(Len) ->
-    to_mask(16#ffffffffffffffffffffffffffffffff - (16#ffffffffffffffffffffffffffffffff bsr Len), 16, []).
+    [X || <<X:16>> <=
+              <<(16#ffffffffffffffffffffffffffffffff - (16#ffffffffffffffffffffffffffffffff bsr Len)):128>>].
 
-to_mask(_, 0, L) ->
-    L;
-to_mask(Num, I, L) ->
-    to_mask(Num bsr 8, I-1, [Num band 16#ff | L]).
+ip_masklen(Mask) when length(Mask) == 4 ->
+    ip_masklen(Mask, 8);
+ip_masklen(Mask) when length(Mask) == 8 ->
+    ip_masklen(Mask, 16).
 
-ip_masklen([255|L]) ->
-    8+ip_masklen(L);
-ip_masklen([]) ->
-    0;
-ip_masklen([N|_]) -> mask_bitsize(N).
-
-mask_bitsize(0) -> 0;
-mask_bitsize(N) -> 1+mask_bitsize((N bsl 1) band 16#ff).
+ip_masklen(Mask, WordSize) ->
+    Bits = << << Word:WordSize >> || Word <- Mask >>,
+    length([X || <<X:1>> <= Bits, X /= 0]).
 
 %%%===================================================================
 %%% End

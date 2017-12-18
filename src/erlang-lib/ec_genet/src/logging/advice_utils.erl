@@ -1,22 +1,23 @@
 -module(advice_utils).
--export([log_aspects/3]).
+-export([log_aspects/4]).
 -include("log_groups.hrl").
 
-log_aspects(Aspect,Advice,Pointcut) ->
-    ModFuns = [element(2, lists:keyfind(Group, 1, ?LOG_GROUPS)) || {Group, _Level} <- ?LOG_LEVELS],
-    lists:flatten(lists:map(fun (Mod) -> module_aspects({Aspect,Advice,Pointcut},Mod) end, ModFuns)).
+log_aspects({Groups,Levels}, Aspect,Advice,Pointcut) ->
+    lists:flatten([group_aspects(Group, proplists:get_value(Group, Levels), Modules, {Aspect, Advice, Pointcut}) ||
+                      {Group, Modules} <- Groups]).
 
-module_aspects({Aspect,Advice,Pointcut}, {Module, Functions}) ->
+group_aspects(Group, Level, Modules, Callbacks) ->
+    [module_aspects(Group, Level, Module, Functions, Callbacks) || {Module, Functions} <- Modules].
+
+module_aspects(Group, Level, Module, Functions, {Aspect,Advice,Pointcut}) ->
     Funs = fun_list(Functions),
     Modname = "^" ++ atom_to_list(Module) ++ "$",
-    [Aspect(Advice(before, ec_genet_logger, before_advice),
+    [Aspect(Advice(before, ec_genet_logger, before_advice, [Group, Level]),
             [Pointcut(Modname, Funs, "*", global)]),
-     Aspect(Advice(after_return, ec_genet_logger, after_advice),
+     Aspect(Advice(after_return, ec_genet_logger, after_advice, [Group, Level]),
             [Pointcut(Modname, Funs, "*", global)]),
-     Aspect(Advice(after_throw, ec_genet_logger, throw_advice),
-            [Pointcut(Modname, Funs, "*", global)])];
-module_aspects(AAP, ModList) when is_list(ModList) ->
-    lists:map(fun (Mod) -> module_aspects(AAP, Mod) end, ModList).
+     Aspect(Advice(after_throw, ec_genet_logger, throw_advice, [Group]),
+            [Pointcut(Modname, Funs, "*", global)])].
 
 fun_list(Names) ->
     lists:flatten(
