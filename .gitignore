@@ -11,3 +11,4 @@ lux_logs
 *.log
 *.fxs
 trafo-example*.hrl
+/src/erlang-lib/ec_genet/edoc/

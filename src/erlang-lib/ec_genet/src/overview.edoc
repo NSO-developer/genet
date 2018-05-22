@@ -3,15 +3,14 @@ models.  The aim of the {@link ec_genet} and {@link ec_genet_server} modules is 
 a mapping writer to deal with simple cases as easily as possible, as well as to help with
 more complex ones.
 
-<p>The method of operation is as follows:</p>
-<ol>
-<li>the operator performs an action such us <code>commit</code>, <code>show running-config</code> etc. that addresses data in the high-level data model; ConfD invokes appropriate DP-API function in {@link ec_genet}</li>
+<p>This is a brief overview of a mapping operation:</p>
+<ol style="list-style-type: decimal">
+<li>the operator performs an action such as <code>commit</code>, <code>show running-config</code> etc. that addresses data in the high-level data model; ConfD invokes appropriate DP-API function in {@link ec_genet_server}</li>
 <li>based on the path prefix, appropriate mapping module and the registered function (such as {@link ec_map_bgp:get_mappings/1}) is looked up, invoked to get a mapping, <code>inherit</code> is processed</li>
-<li>if the mapping contains the appropriate <em>override</em> (such as the <code>exists</code> field in case of existence check), it is invoked and the result returned to ConfD</li>
+<li>if the mapping contains the right <em>override</em> callback (such as the <code>exists</code> field in case of existence check), it is invoked and the result returned to ConfD</li>
 <li>high-level path is rewritten to low-level path using callbacks like <code>fdnkeys</code> (if defined)</li>
 <li>the operation on the low-level path is performed (a leaf value set or retrieved, list instance found, etc.) and the result returned to ConfD.</li>
 </ol>
-
 == DP-API callbacks ==
 
 <p>The DP-API functions mentioned above are the only interface for ConfD to query about the status of high-level configuration, or to notify about changes in the high-level configuration. Some of the DP-API functions are optional; the <code>ec_genet</code> framework implements the following ones (see the ConfD documentation, <code>confd_lib_dp</code> manpage for more details on DP-API functions, especially the documentation for <code>confd_register_data_cb</code>):</p>
@@ -34,7 +33,6 @@ more complex ones.
 <p>This callback will be invoked by ConfD during commit to set a case of a choice.</p></li>
 </ul>
 <p>For each of the DP-API functions we can define a <em>override</em> (see below for more on overrides); just note that a DP-API function and its <em>override</em> are not the same things.</p>
-
 == The mappings record ==
 
 <p>The central part in guiding the genet code is the type {@link ec_genet:mappings()}. Below is a complete list of fields that can be used; but in typical cases only few of them need to be defined - in the simplest cases only <code>path', or</code>inherit' and `relpath'.</p>
@@ -102,7 +100,6 @@ more complex ones.
 <dd><p>Used: for <code>set_elem</code> and <code>set_case</code> invocations.</p>
 </dd>
 </dl>
-
 == DP-API overrides ==
 
 <p>In case the genet processing is too restrictive, it is possible to skip most of it and use one of the following <em>overrides</em>; they correspond to their DP-API counterparts, and given override can be invoked if and only if the corresponding called DP-API function has been invoked for given element; the only exception is that <code>get_elem</code> override is invoked if <code>exists_optional</code> DP-API has been invoked and <code>exists</code> override not defined.</p>

@@ -42,6 +42,12 @@ all: $(NCS_DIR)/erlang/econfd/ebin logging_all $(EBIN_FILES)
 EDOC_FLAG = ../edoc/.done
 docs: $(EDOC_FLAG)
 
+MARKDOWN_COMMAND ?= pandoc
+overview.edoc: overview.md
+	which $(MARKDOWN_COMMAND) > /dev/null \
+	|| (echo "No markdown processor found, cannot regenerate doc overview"; false)
+	awk -f md.awk -v markdown_command=$(MARKDOWN_COMMAND) < overview.md >| overview.edoc
+
 $(EDOC_FLAG): $(ERL_FILES) $(wildcard ../include/*.hrl) overview.edoc
 	@mkdir -p $(dir $(EDOC_FLAG))
 	erl -noshell -s edoc_run application genet '"."' \
