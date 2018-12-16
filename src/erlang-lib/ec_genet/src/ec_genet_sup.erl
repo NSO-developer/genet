@@ -33,13 +33,15 @@ init([]) ->
     Shutdown = 2000,
     Type = worker,
 
+    GenetOwner = {ec_genet_owner, {ec_genet_owner, start_link, []},
+                  Restart, Shutdown, Type, [ec_genet_owner]},
     GenetChild = {ec_genet_server, {ec_genet_server, start_link, []},
                   Restart, Shutdown, Type, [ec_genet_server]},
     LoggerChild = {ec_genet_logger, {ec_genet_logger, start_link, []},
                   Restart, Shutdown, Type, [ec_genet_logger]},
     LogConfSubChild = {ec_genet_logconf, {ec_genet_subscriber, start_link, []},
                   Restart, Shutdown, Type, [ec_genet_subscriber]},
-    {ok, {SupFlags, [GenetChild, LoggerChild, LogConfSubChild]}}.
+    {ok, {SupFlags, [GenetOwner, GenetChild, LoggerChild, LogConfSubChild]}}.
 
 %%%===================================================================
 %%% Internal functions
