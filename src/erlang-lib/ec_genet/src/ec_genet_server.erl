@@ -53,7 +53,6 @@ init([]) ->
     ok = econfd:register_trans_cb(Daemon, TransDP),
     ok = econfd:register_data_cb(Daemon, DP),
     ok = econfd:register_done(Daemon),
-    ets:new(ec_genet_maps, [ordered_set, public, named_table, {read_concurrency,true}]),
     log(info, "Server started", []),
     {ok, #state{}}.
 
@@ -72,6 +71,9 @@ handle_cast(Msg, State) ->
     {noreply, State}.
 
 %%--------------------------------------------------------------------
+handle_info({'EXIT',_,shutdown}, State) ->
+    log(error, "Received process shutdown info; stopping daemon", []),
+    {stop, shutdown, State};
 handle_info(Info, State) ->
     log(error, "Got unexpected info: ~p", [Info]),
     {noreply, State}.
