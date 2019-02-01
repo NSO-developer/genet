@@ -42,6 +42,9 @@ handle_cast(Msg, State) ->
     {noreply, State}.
 
 %%--------------------------------------------------------------------
+handle_info({'EXIT',_,_}, State) ->
+    eclog(error, "Received process exit info; stopping subscriber", []),
+    {stop, shutdown, State};
 handle_info(Info, State) ->
     eclog(error, "Got unexpected info: ~p", [Info]),
     {noreply, State}.
