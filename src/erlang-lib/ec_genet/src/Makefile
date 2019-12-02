@@ -70,7 +70,7 @@ $(NCS_DIR)/erlang/econfd/ebin:
 	exit 1
 
 clean:
-	rm -f $(EBIN_FILES) $(NS_FILES) erl_crash.dump core* *~
+	rm -f $(EBIN_FILES) $(NS_FILES) erl_crash.dump core* *~ overview.edoc
 	$(MAKE) -C logging clean
 
 ../ebin/%.app: %.app.src ../vsn.mk Makefile

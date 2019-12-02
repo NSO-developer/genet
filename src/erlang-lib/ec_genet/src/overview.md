@@ -82,7 +82,7 @@ same things.
 The central part in guiding the genet code is the type {@link
 ec_genet:mappings()}. Below is a complete list of fields that can be used; but
 in typical cases only few of them need to be defined - in the simplest cases
-only `path', or`inherit' and `relpath'.
+only `path`, or `inherit` and `relpath`.
 
 In many cases, the way how given field is used (if at all) is given by what
 DP-API function has been invoked by ConfD. This also means that for mappings

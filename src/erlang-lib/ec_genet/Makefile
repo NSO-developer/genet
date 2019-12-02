@@ -1,6 +1,6 @@
 SUBDIRS = src
 
-all clean:
+docs all clean:
 	@set -e ; \
 	  for d in $(SUBDIRS) ; do \
 	    if [ -f $$d/Makefile ]; then \

@@ -16,7 +16,6 @@
 -behaviour(application).
 -include_lib("econfd/include/econfd.hrl").
 -include_lib("econfd/include/econfd_errors.hrl").
-%% @headerfile "ec_genet.hrl"
 -include("ec_genet.hrl").
 -include("debug_macros.hrl").
 -export([start/2,stop/1,

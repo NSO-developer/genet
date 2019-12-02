@@ -1,47 +1,86 @@
-%% path = ikeypath(),
-%% relpath = ikeypath(),
-%% extra = any(),
-%% inherit = ikeypath(),
-%% nested = [mappings()],
-%% fexists = (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) -> not_found | any(),
-%% fdnpath = (Tctx :: confd_trans_ctx(), KeyedLLPath :: ikeypath(), Extra :: any()) -> ikeypath(),
-%% fopmap = (Tctx :: confd_trans_ctx(), Op :: atom(), Path :: ikeypath(), Arg :: any(), Mappings :: mappings()) -> {confd_trans_ctx(), atom(), ikeypath(), any(), mappings()},
-%% fupkeys = (Tctx :: confd_trans_ctx(), Op :: atom(), Keys :: key(), Extra :: any()) -> key(),
-%% fdnkeys = (Tctx :: confd_trans_ctx(), KeySet :: [key()], Extra :: any()) -> [key()],
-%% fupval = (Tctx :: confd_trans_ctx(), Op :: atom(), RawVal :: value(), Extra :: any()) -> value(),
-%% fdnval = (Tctx :: confd_trans_ctx(), Op :: atom(), RawVal :: value(), Extra :: any()) -> value(),
-%% get_elem = (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) -> value() | not_found | err(),
-%% exists = (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) -> boolean() | err(),
-%% create = (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) -> ok | err(),
-%% delete = (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) -> ok | err(),
-%% move_after = (Tctx :: confd_trans_ctx{}, HLPath :: ikeypath(), PrevKeys :: {value()}, Extra :: any()) -> ok | err(),
-%% set_elem = (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Val :: value(), Extra :: any()) -> ok | err(),
-%% get_next = (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), C :: maapi_cursor(), Extra :: any()) -> {false, undefined} | {ok, key(), maapi_cursor()} | err(),
-%% get_case = (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Choice :: qtag() | [qtag()], Extra :: any()) -> qtag() | err(),
-%% set_case = (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Choice :: qtag() | [qtag()], qtag(), Extra :: any()) -> ok | err()
-%%
+-type err() :: {'error', Reason :: any() }.
 
-%% @type mappings() = #mappings{}
 -record(mappings, {
-          path = none,
-          relpath = none,
-          extra = none,
-          inherit = none,
-          nested = none,
-          fexists = none,
-          fdnpath = none,
-          fopmap = none,
-          fupkeys = none,
-          fdnkeys = none,
-          fupval = none,
-          fdnval = none,
-          get_elem = none,
-          exists = none,
-          create = none,
-          delete = none,
-          move_after = none,
-          set_elem = none,
-          get_next = none,
-          get_case = none,
-          set_case = none
+          path = none :: econfd:ikeypath(),
+          relpath = none :: econfd:ikeypath(),
+          extra = none :: any(),
+          inherit = none :: econfd:ikeypath(),
+          nested = none :: [#mappings{}],
+          fexists = none :: fun((Tctx :: #confd_trans_ctx{},
+                                 HLPath :: econfd:ikeypath(),
+                                 Extra :: any())
+                                -> not_found | any()),
+          fdnpath = none :: fun((Tctx :: #confd_trans_ctx{},
+                                 KeyedLLPath :: econfd:ikeypath(),
+                                 Extra :: any())
+                                -> econfd:ikeypath()),
+          fopmap = none :: fun((Tctx :: #confd_trans_ctx{},
+                                Op :: atom(),
+                                Path :: econfd:ikeypath(),
+                                Arg :: any(),
+                                Mappings :: #mappings{})
+                               -> {#confd_trans_ctx{}, atom(), econfd:ikeypath(), any(), #mappings{}}),
+          fupkeys = none :: fun((Tctx :: #confd_trans_ctx{},
+                                 Op :: atom(),
+                                 Keys :: econfd:key(),
+                                 Extra :: any())
+                                -> econfd:key()),
+          fdnkeys = none :: fun((Tctx :: #confd_trans_ctx{},
+                                 KeySet :: [econfd:key()],
+                                 Extra :: any())
+                                -> [econfd:key()]),
+          fupval = none :: fun((Tctx :: #confd_trans_ctx{},
+                                Op :: atom(),
+                                RawVal :: econfd:value(),
+                                Extra :: any())
+                               -> econfd:value()),
+          fdnval = none :: fun((Tctx :: #confd_trans_ctx{},
+                                Op :: atom(),
+                                RawVal :: econfd:value(),
+                                Extra :: any())
+                               -> econfd:value()),
+          get_elem = none :: fun((Tctx :: #confd_trans_ctx{},
+                                  HLPath :: econfd:ikeypath(),
+                                  Extra :: any())
+                                 -> econfd:value() | not_found | err()),
+          exists = none :: fun((Tctx :: #confd_trans_ctx{},
+                                HLPath :: econfd:ikeypath(),
+                                Extra :: any())
+                               -> boolean() | err()),
+          create = none :: fun((Tctx :: #confd_trans_ctx{},
+                                HLPath :: econfd:ikeypath(),
+                                Extra :: any())
+                               -> ok | err()),
+          delete = none :: fun((Tctx :: #confd_trans_ctx{},
+                                HLPath :: econfd:ikeypath(),
+                                Extra :: any())
+                               -> ok | err()),
+          move_after = none :: fun((Tctx :: #confd_trans_ctx{},
+                                    HLPath :: econfd:ikeypath(),
+                                    PrevKeys :: {econfd:value()},
+                                    Extra :: any())
+                                   -> ok | err()),
+          set_elem = none :: fun((Tctx :: #confd_trans_ctx{},
+                                  HLPath :: econfd:ikeypath(),
+                                  Val :: econfd:value(),
+                                  Extra :: any())
+                                 -> ok | err()),
+          get_next = none :: fun((Tctx :: #confd_trans_ctx{},
+                                  HLPath :: econfd:ikeypath(),
+                                  C :: econfd:maapi_cursor(),
+                                  Extra :: any())
+                                 -> {false,undefined} |
+                                    {ok, econfd:key(), econfd:maapi_cursor()} |
+                                    err()),
+          get_case = none :: fun((Tctx :: #confd_trans_ctx{},
+                                  HLPath :: econfd:ikeypath(),
+                                  Choice :: econfd:qtag() | [econfd:qtag()],
+                                  Extra :: any())
+                                 -> econfd:qtag() | err()),
+          set_case = none :: fun((Tctx :: #confd_trans_ctx{},
+                                  HLPath :: econfd:ikeypath(),
+                                  Choice :: econfd:qtag() | [econfd:qtag()],
+                                  econfd:qtag(),
+                                  Extra :: any())
+                                 -> ok | err())
          }).
