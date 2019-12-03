@@ -1,4 +1,4 @@
-SUBDIRS=$(wildcard */Makefile ../erlang-lib/*/Makefile)
+SUBDIRS=$(wildcard */Makefile erlang-lib/*/Makefile)
 
 all clean:
 	for f in $(SUBDIRS); do \
@@ -6,4 +6,4 @@ all clean:
 	done
 
 docs:
-	$(MAKE) -C ../erlang-lib/ec_genet $@
+	$(MAKE) -C erlang-lib/ec_genet $@

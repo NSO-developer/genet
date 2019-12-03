@@ -1,4 +1,4 @@
-include $(NCS_DIR)/src/ncs/build/include.ncs.mk 
+include ../../../include.mk
 include ../vsn.mk
 
 APP_DIR    = $(shell dirname $(CURDIR))
@@ -12,23 +12,14 @@ NS_DIR	   = ../ns
 NS_FILES   = $(YANGS:$(YANG_DIR)/%.yang=$(NS_DIR)/%.hrl)
 HRL_FILES  = $(wildcard *.hrl) $(wildcard ../include/*.hrl) $(NS_FILES)
 
-NCS_VERSION ?= 4.5
-NCS_VERSION_CHECK = $(shell head -n1 $(NCS_DIR)/VERSION \
-	| cut -d . -f-2 \
-	| awk '{if ($$2 < $(NCS_VERSION)) {print "old"} else {print "new"}}')
-
 ERLC       = erlc
 ERLC_FLAGS := \
 	+debug_info \
 	-I $(APP_DIR)/include \
 	-I $(APP_DIR)/ns \
 	+warnings_as_errors \
-	-pa $(NCS_DIR)/erlang/econfd/ebin \
+	-pa $(SYSTEM_DIR)/erlang/econfd/ebin \
 	-pa ../../ec_genet/ebin
-
-ifeq ($(NCS_VERSION_CHECK), old)
-ERLC_FLAGS += -DCONFD_CS_IS_LEAF_LIST=0
-endif
 
 ifndef NO_AOP_LOGGING
 ERLC_FLAGS += '+{parse_transform,aop}' '+{aop_config_dir, "logging"}' '+{aop_groups_module, genet_logging}'
@@ -37,7 +28,7 @@ endif
 
 APPSCRIPT = '$$vsn=shift; $$mods=""; while(@ARGV){ $$_=shift; s/^([A-Z].*)$$/\'\''$$1\'\''/; $$mods.=", " if $$mods; $$mods .= $$_; } while(<>) { s/%VSN%/$$vsn/; s/%MODULES%/$$mods/; print; }'
 
-all: $(NCS_DIR)/erlang/econfd/ebin logging_all $(EBIN_FILES)
+all: $(SYSTEM_DIR)/erlang/econfd/ebin logging_all $(EBIN_FILES)
 
 EDOC_FLAG = ../edoc/.done
 docs: $(EDOC_FLAG)
@@ -60,14 +51,9 @@ logging_all:
 
 
 $(NS_DIR)/%.hrl: $(YANG_DIR)/%.yang
-	$(NCSC) --emit-hrl $@ $(addprefix -a , $(wildcard $(YANG_DIR)/$*-ann.yang)) \
-		--yangpath $(NCS_DIR)/src/ncs/yang \
+	$(COMPILER) --emit-hrl $@ $(addprefix -a , $(wildcard $(YANG_DIR)/$*-ann.yang)) \
+		--yangpath $(SYSTEM_DIR)/src/$(SYSTEM)/yang \
 		--strict-yang --fail-on-warnings $<
-
-
-$(NCS_DIR)/erlang/econfd/ebin:
-	@echo 'Where is NCS installed? Set $$NCS_DIR to point it out!'
-	exit 1
 
 clean:
 	rm -f $(EBIN_FILES) $(NS_FILES) erl_crash.dump core* *~ overview.edoc

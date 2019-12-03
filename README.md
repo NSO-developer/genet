@@ -13,7 +13,16 @@ presence.
 
 ## Building and running with ConfD
 
-(to be completed)
+To compile the package with ConfD, make sure that `$CONFD_DIR` points to the
+confd installation directory (and also that `$NCS_DIR` does not exist); with
+that, `make all` compiles all that is needed.
+
+So as to run the transform code ConfD needs two paths to be added to its load
+path, e.g. using `--addloadpath`:
+
+ * path to the root of the package; ConfD will notice the `erlang-lib`
+   subdirectory load the genet application from there;
+ * path to `load-dir` to point ConfD to the genet configuration data model.
 
 
 ## Configuring
