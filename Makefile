@@ -1,2 +1,2 @@
-all clean:
+docs all clean:
 	$(MAKE) -C src $@

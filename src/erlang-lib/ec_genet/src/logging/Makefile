@@ -1,3 +1,4 @@
+include ../../../../include.mk
 include ../../vsn.mk
 
 ERL_FILES  = $(wildcard *.erl)
@@ -10,13 +11,9 @@ ERLC_FLAGS := \
 	+debug_info \
 	-I ../../include \
 	+warnings_as_errors \
-	-pa $(NCS_DIR)/erlang/econfd/ebin
+	-pa $(SYSTEM_DIR)/erlang/econfd/ebin
 
-all: $(NCS_DIR)/erlang/econfd/ebin $(EBIN_FILES)
-
-$(NCS_DIR)/erlang/econfd/ebin:
-	@echo 'Where is NCS installed? Set $$NCS_DIR to point it out!'
-	exit 1
+all: $(SYSTEM_DIR)/erlang/econfd/ebin $(EBIN_FILES)
 
 clean:
 	rm -f $(EBIN_FILES) erl_crash.dump core* *~
