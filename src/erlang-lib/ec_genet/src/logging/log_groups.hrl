@@ -20,7 +20,7 @@
 
 -define(GenetAux,
         [exists,get_elem_str,get_elem,get_case,set_elem_str,set_elem,create,
-         create_if_nonexist,delete,delete_if_exists,move,init_cursor,get_next,
+         create_if_nonexist,delete,delete_if_exists,move,move_after,init_cursor,get_next,
          composite_list_get_next,composite_list_advance_state_union,
          composite_list_advance_state,composite_list_initial_state,switch_discriminator,
          join_prio,join_pick,join_pick_not_equals,joined_lists_next,get_dynamic_list_next]).

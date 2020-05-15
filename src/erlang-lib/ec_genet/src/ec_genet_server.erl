@@ -520,6 +520,15 @@ process_mapping_core(Op, Tctx, HLPath, Arg, Mappings) ->
                 {error, Error} -> {error, Error}
             end;
 
+        move_after ->
+            %% Arg is {} ("move to the first position") or Key
+            LLVal = process_value(Op, Tctx, Arg, Mappings, HLPath),
+            Path = process_path(Tctx, HLPath, Mappings),
+            case process_opmap(Op, Tctx, Path, LLVal, Mappings) of
+                {ok,_} -> ok;
+                ok -> ok;
+                {error, Error} -> {error, Error}
+            end;
         %% FIXME: Implement more operation cases, *_object/...
 
         _ ->
@@ -657,6 +666,18 @@ process_value(Op, Tctx, RawVal, Mappings, HLPath) ->
         {set_case, #mappings{fdnval=FdnVal}} when FdnVal /= none ->
             {ok, RetVal} = ?CALLMAP(fdnval,NewVal,FdnVal,Tctx,Op,RawVal,Extra),
             RetVal;
+        {move_after, #mappings{fdnval=FdnVal}} ->
+            case FdnVal of
+                none ->
+                    case RawVal of {} ->
+                            first;
+                        _ ->
+                            {'after',RawVal}
+                    end;
+                _ ->
+                    {ok, RetVal} = ?CALLMAP(fdnval,NewVal,FdnVal,Tctx,Op,RawVal,Extra),
+                    RetVal
+            end;
 
         %% FIXME: Implement more operation cases, *_object/...
 
@@ -757,6 +778,20 @@ default_ll_op(get_case, Tctx, [LLChoice|Path], _HLChoice, _Mappings) ->
 default_ll_op(set_case, _Tctx, _Path, {_Choice, _Case}, _Mappings) ->
     %% By default, nothing needs to be done for set_case
     ok;
+default_ll_op(move_after, Tctx, Path, After, _Mappings) ->
+    %% After is 'first' or {'after',Keys}
+    M = tctx_maapi_sock(Tctx),
+    TH = tctx_maapi_thandle(Tctx),
+    CPath = convert_path(Path),
+    CAfter = case After of
+                first ->
+                    first;
+                 last ->
+                     last;
+                {Where,Keys} ->
+                    {Where,convert_key_values(tl(CPath), Keys)}
+            end,
+    ok = econfd_maapi:move_ordered(M, TH, CPath, CAfter);
 default_ll_op(nop, _Tctx, _Path, _Arg, _Mappings) ->
     %% No operation; only possibly used by fopmap, need to return value compatible with
     %% other operations
