@@ -778,10 +778,16 @@ extract_keys(Path) ->
 inject_keys(Path, KeySet) ->
     {InjectedPath, []} = lists:mapfoldl(fun inject_keys_int/2, KeySet, Path),
     InjectedPath.
-inject_keys_int({}, [FirstKey|RemainingKeySet]) ->
-    {FirstKey, RemainingKeySet};
 inject_keys_int(E, KeySet) ->
-    {E, KeySet}.
+    IsTuple = is_tuple(E),
+    if
+    (IsTuple == true) ->
+        %% Replace key with new key.
+        [FirstKey|RemainingKeySet] = KeySet,
+        {FirstKey, RemainingKeySet};
+    true ->
+        {E, KeySet}
+    end.
 
 tctx_maapi_sock(Tctx) ->
     Tctx#confd_trans_ctx.opaque.
