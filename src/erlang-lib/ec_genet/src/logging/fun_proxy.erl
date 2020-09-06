@@ -183,7 +183,7 @@ call_after_thr_advice(Line, Aspect) ->
     call_generic_advice(
       Line,
       Aspect,
-      [{var, Line, 'T'},{tuple, Line,[{var,Line,'Ex'},{var,Line,'Rz'}]}]
+      [{var, Line, 'T'},{tuple, Line,[{var,Line,'Ex'},{var,Line,'Rz'},{var,Line,'Tr'}]}]
      )
         .
 
@@ -308,7 +308,7 @@ body_gen_try(Module, Name, Arity, Hidden_name, Line,
         clause,Line,
         [{
            tuple,Line,
-           [{var,Line,'Ex'},{var,Line,'Rz'},{var,Line,'_'}]
+           [{var,Line,'Ex'},{var,Line,'Rz'},{var,Line,'Tr'}]
          }],
         [],
         body_gen_aft_thr(Module, Name, Arity, Line, After_thr_Aspects, [])

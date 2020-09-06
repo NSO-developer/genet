@@ -60,9 +60,9 @@ before_advice(Group, Level, Desc) ->
 after_advice(Group, Level, Desc, R) ->
     request({after_advice, {Group, Level}, Desc, R}).
 
-throw_advice(Group, Desc, {Exc,R}) ->
+throw_advice(Group, Desc, {Exc,R,Tr}) ->
     request({throw_advice, {Group, warn}, Desc, {Exc, R}}),
-    erlang:raise(Exc, R, erlang:get_stacktrace()).
+    erlang:raise(Exc, R, Tr).
 
 log(Level, Module, Line, Args) ->
     request({log, Level, Module, Line, Args}).
