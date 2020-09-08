@@ -263,7 +263,7 @@ set_case(Tctx, HLPath, Choice, Case) ->
 
 throw_callmap_error(CallmapError,CallmapReason,CallmapTrace,Name) ->
     FileLine =
-        case Trace of
+        case CallmapTrace of
             [{_,_,_,[{file,FName},{line,FLine}]}|_] ->
 
                 " at "++FName++":"++integer_to_list(FLine);
