@@ -153,7 +153,8 @@ corresponding *override*, other mappings fields are ignored.
 
 :  Used: all DP-API invocations.
 
-**`fopmap`**`: (Tctx :: confd_trans_ctx(), Op :: atom(), Path :: ikeypath(), Arg :: any(), Mappings :: mappings()) -> {confd_trans_ctx(), atom(), ikeypath(), any(), mappings()}`
+**`fopmap`**`: (Tctx :: confd_trans_ctx(), Op :: atom(), Path :: ikeypath(), Arg :: any(), Mappings :: mappings()) ->
+    {confd_trans_ctx(), atom(), ikeypath(), any(), mappings()}`
 
 :  Callback invoked after path has been transformed, but before the final
    low-level operation is performed. Can be used e.g. to change the destination
@@ -189,7 +190,9 @@ corresponding *override*, other mappings fields are ignored.
 :  This is invoked to transform a high-level value to its low-level
    representation.
 
-:  Used: for `set_elem` and `set_case` invocations.
+:  Used: for `set_elem` (the argument is a HL value), `set_case` (the argument
+   is a choices/case name pair), and `move_after` (empty tuple - "move to the
+   first position" - or a key set).
 
 
 == DP-API overrides ==
@@ -205,11 +208,21 @@ Again, this means that some combinations of node and an override for its
 mapping are meaningless, such as `get_elem` override in a mapping for a list
 will never be invoked.
 
- * **`get_elem`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) -> value() | not_found | err()`
- * **`exists`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) -> boolean() | err()`
- * **`create`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) -> ok | err()`
- * **`delete`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) -> ok | err()`
- * **`set_elem`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Val :: value(), Extra :: any()) -> ok | err()`
- * **`get_next`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), C :: maapi_cursor(), Extra :: any()) -> {false, undefined} | {ok, key(), maapi_cursor()} | err()`
- * **`get_case`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Choice :: qtag() | [qtag()], Extra :: any()) -> qtag() | err()`
- * **`set_case`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Choice :: qtag() | [qtag()], qtag(), Extra :: any()) -> ok | err()`
+ * **`get_elem`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) ->
+   value() | not_found | err()`
+ * **`exists`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) ->
+   boolean() | err()`
+ * **`create`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) ->
+   ok | err()`
+ * **`delete`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Extra :: any()) ->
+   ok | err()`
+ * **`set_elem`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), Val :: value(), Extra :: any()) ->
+   ok | err()`
+ * **`get_next`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(), C :: maapi_cursor(), Extra :: any()) ->
+   {false, undefined} | {ok, key(), maapi_cursor()} | err()`
+ * **`get_case`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(),
+                     Choice :: qtag() | [qtag()], Extra :: any()) ->
+   qtag() | err()`
+ * **`set_case`**`: (Tctx :: confd_trans_ctx(), HLPath :: ikeypath(),
+                     Choice :: qtag() | [qtag()], qtag(), Extra :: any()) ->
+   ok | err()`
