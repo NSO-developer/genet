@@ -129,8 +129,7 @@ get_mappings(HLPath) ->
     try
         get_mapping_record(MappingFun,HLPath)
     catch
-        Reason:Error ->
-            Trace = erlang:get_stacktrace(),
+        Reason:Error:Trace ->
             ?LOGWARN("Mapping record failure, using null map", HLPath, Reason, Error, Trace),
             get_mapping_record(fun(_) -> none end,HLPath)
     end.
@@ -262,17 +261,16 @@ set_case(Tctx, HLPath, Choice, Case) ->
 %%% Mapping Function Interface
 %%%===================================================================
 
-throw_callmap_error(CallmapError,CallmapReason,Name) ->
-    Trace = erlang:get_stacktrace(),
+throw_callmap_error(CallmapError,CallmapReason,CallmapTrace,Name) ->
     FileLine =
-        case Trace of
+        case CallmapTrace of
             [{_,_,_,[{file,FName},{line,FLine}]}|_] ->
 
                 " at "++FName++":"++integer_to_list(FLine);
             _ ->
                 ""
         end,
-    ?LOGERR("Caught exception in "++Name++" mapping function"++FileLine, CallmapError, CallmapReason, Trace),
+    ?LOGERR("Caught exception in "++Name++" mapping function"++FileLine, CallmapError, CallmapReason, CallmapTrace),
     throw({CallmapError, CallmapReason}).
 
 -define(CALLMAP(Name, RetMatch, Fun, Tctx, Arg1, Arg2),
@@ -282,8 +280,8 @@ throw_callmap_error(CallmapError,CallmapReason,Name) ->
             ?LOGINFO("Returned from "++??Name++" mapping function", RetMatch),
             {ok, RetMatch}
         catch
-            CallmapError:CallmapReason ->
-                throw_callmap_error(CallmapError,CallmapReason,??Name)
+            CallmapError:CallmapReason:CallmapTrace ->
+                throw_callmap_error(CallmapError,CallmapReason,CallmapTrace,??Name)
         end).
 
 -define(CALLMAP(Name, RetMatch, Fun, Tctx, Arg1, Arg2, Arg3),
@@ -293,8 +291,8 @@ throw_callmap_error(CallmapError,CallmapReason,Name) ->
             ?LOGINFO("Returned from "++??Name++" mapping function", RetMatch),
             {ok, RetMatch}
         catch
-            CallmapError:CallmapReason ->
-                throw_callmap_error(CallmapError,CallmapReason,??Name)
+            CallmapError:CallmapReason:CallmapTrace ->
+                throw_callmap_error(CallmapError,CallmapReason,CallmapTrace,??Name)
         end).
 
 -define(CALLMAP(Name, RetMatch, Fun, Tctx, Arg1, Arg2, Arg3, Arg4),
@@ -304,8 +302,8 @@ throw_callmap_error(CallmapError,CallmapReason,Name) ->
             ?LOGINFO("Returned from "++??Name++" mapping function", RetMatch),
             {ok, RetMatch}
         catch
-            CallmapError:CallmapReason ->
-                throw_callmap_error(CallmapError,CallmapReason,??Name)
+            CallmapError:CallmapReason:CallmapTrace ->
+                throw_callmap_error(CallmapError,CallmapReason,CallmapTrace,??Name)
         end).
 
 -define(CALLMAP(Name, RetMatch, Fun, Tctx, Arg1, Arg2, Arg3, Arg4, Arg5),
@@ -315,8 +313,8 @@ throw_callmap_error(CallmapError,CallmapReason,Name) ->
             ?LOGINFO("Returned from "++??Name++" mapping function", RetMatch),
             {ok, RetMatch}
         catch
-            CallmapError:CallmapReason ->
-                throw_callmap_error(CallmapError,CallmapReason,??Name)
+            CallmapError:CallmapReason:CallmapTrace ->
+                throw_callmap_error(CallmapError,CallmapReason,CallmapTrace,??Name)
         end).
 
 %%%===================================================================
@@ -336,8 +334,7 @@ process_mapping(Op, Tctx, HLPath, Arg, Mappings) ->
             {error, format_error(Msg)};
         _:{throw,{error, Msg}} ->
             {error, format_error(Msg)};
-        Error:Reason ->
-            Trace = erlang:get_stacktrace(),
+        Error:Reason:Trace ->
             FileLine =
                 case Trace of
                     [{_,_,_,[{file,FName},{line,FLine}]}|_] ->
